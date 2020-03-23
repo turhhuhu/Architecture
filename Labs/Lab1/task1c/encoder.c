@@ -4,27 +4,28 @@
 #define LOWER_CASE_HIGH_BOUND 122
 #define LOWER_CASE_TO_HIGHER_CASE_DIFF 32
 
-void debug(int isInDebug, char *string)
+void debug(FILE *debugOutput, int isInDebug, char *string)
 {
     if (isInDebug)
     {
-        FILE *errOutput = stderr;
-        fprintf(errOutput, "%s\n", string);
+        fprintf(debugOutput, "%s\n", string);
     }
 }
 
-void debugCompute(int isInDebug, char beforeComputeation, char afterComputation)
+void debugCompute(FILE *debugOutput, int isInDebug, char beforeComputeation, char afterComputation)
 {
     if (isInDebug)
     {
-        FILE *errOutput = stderr;
-        fprintf(errOutput, "%d\t%d\n", beforeComputeation, afterComputation);
+        fprintf(debugOutput, "%d\t%d\n", beforeComputeation, afterComputation);
     }
 }
 
 int main(int argc, char **argv)
 {
-    int i, encryptChar, inputChar;
+    FILE *output = stdout;
+    FILE *input = stdin;
+    FILE *debugOutput = stderr;
+    int i, encryptChar, inputChar, inputcharCompute;
     char *encryptionString;
     int isInDebug = 0;
     int isEncrypted = 0;
@@ -48,57 +49,43 @@ int main(int argc, char **argv)
             encryptionString = argv[i] + 2;
         }
     }
+
     for (i = 1; i < argc; i++)
     {
-        debug(isInDebug, argv[i]);
+        debug(debugOutput, isInDebug, argv[i]);
     }
 
-    while (!feof(stdin))
+    while (!feof(input))
     {
-        inputChar = getc(stdin);
+        inputChar = getc(input);
         if (inputChar == '\n')
         {
-            debug(isInDebug, "");
+            debug(debugOutput, isInDebug, "");
             encryptionIndex = 0;
-            printf("%s", "\n");
+            fprintf(output, "%s", "\n");
         }
         else if (inputChar == -1)
         {
-            printf("%c", inputChar);
+            continue;
         }
         else if (isEncrypted)
         {
-            if (encryptionString[encryptionIndex] == '\0')
-            {
-                encryptionIndex = 0;
-            }
+            encryptionIndex = (encryptionString[encryptionIndex] == '\0') ? 0 : encryptionIndex;
             encryptChar = encryptionString[encryptionIndex];
             encryptChar -= '0';
-            if (isSubEncryption)
-            {
-                debugCompute(isInDebug, inputChar, inputChar - encryptChar);
-                printf("%c", inputChar - encryptChar);
-            }
-            else
-            {
-                debugCompute(isInDebug, inputChar, inputChar + encryptChar);
-                printf("%c", inputChar + encryptChar);
-            }
+            inputcharCompute = (isSubEncryption) ? inputChar - encryptChar : inputChar + encryptChar;
+            debugCompute(debugOutput, isInDebug, inputChar, inputcharCompute);
+            fprintf(output, "%c", inputcharCompute);
             encryptionIndex++;
         }
         else
         {
-            if (inputChar >= LOWER_CASE_LOW_BOUND && inputChar <= LOWER_CASE_HIGH_BOUND)
-            {
-                debugCompute(isInDebug, inputChar, inputChar - LOWER_CASE_TO_HIGHER_CASE_DIFF);
-                printf("%c", inputChar - LOWER_CASE_TO_HIGHER_CASE_DIFF);
-            }
-            else
-            {
-                debugCompute(isInDebug, inputChar, inputChar);
-                printf("%c", inputChar);
-            }
+            inputcharCompute = (inputChar >= LOWER_CASE_LOW_BOUND && inputChar <= LOWER_CASE_HIGH_BOUND) ? \
+             inputChar - LOWER_CASE_TO_HIGHER_CASE_DIFF : inputChar;
+            debugCompute(debugOutput, isInDebug, inputChar, inputcharCompute);
+            fprintf(output, "%c", inputcharCompute);
         }
     }
-    printf("%s", "\n");
+    fclose(output);
+    fclose(input);
 }
