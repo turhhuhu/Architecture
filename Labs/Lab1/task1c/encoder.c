@@ -3,6 +3,7 @@
 #define LOWER_CASE_LOW_BOUND 97
 #define LOWER_CASE_HIGH_BOUND 122
 #define LOWER_CASE_TO_HIGHER_CASE_DIFF 32
+#define EOF (-1)
 
 void debug(FILE *debugOutput, int isInDebug, char *string)
 {
@@ -25,13 +26,12 @@ int main(int argc, char **argv)
     FILE *output = stdout;
     FILE *input = stdin;
     FILE *debugOutput = stderr;
-    int i, encryptChar, inputChar, inputcharCompute;
+    int i, encryptChar, inputChar, inputCharAfterComputation;
+    int isInDebug = 0, isEncrypted = 0, encryptionIndex = 0, \
+        isSubEncryption = 0;
     char *encryptionString;
-    int isInDebug = 0;
-    int isEncrypted = 0;
-    int encryptionIndex = 0;
-    int isSubEncryption = 0;
-    for (i = 1; i < argc; i++)
+
+    for (i=1; i < argc; i++)
     {
         if (strcmp(argv[i], "-D") == 0)
         {
@@ -48,6 +48,7 @@ int main(int argc, char **argv)
             isSubEncryption = 1;
             encryptionString = argv[i] + 2;
         }
+
     }
 
     for (i = 1; i < argc; i++)
@@ -64,7 +65,7 @@ int main(int argc, char **argv)
             encryptionIndex = 0;
             fprintf(output, "%s", "\n");
         }
-        else if (inputChar == -1)
+        else if (inputChar == EOF)
         {
             continue;
         }
@@ -73,19 +74,17 @@ int main(int argc, char **argv)
             encryptionIndex = (encryptionString[encryptionIndex] == '\0') ? 0 : encryptionIndex;
             encryptChar = encryptionString[encryptionIndex];
             encryptChar -= '0';
-            inputcharCompute = (isSubEncryption) ? inputChar - encryptChar : inputChar + encryptChar;
-            debugCompute(debugOutput, isInDebug, inputChar, inputcharCompute);
-            fprintf(output, "%c", inputcharCompute);
+            inputCharAfterComputation = (isSubEncryption) ? inputChar - encryptChar : inputChar + encryptChar;
+            debugCompute(debugOutput, isInDebug, inputChar, inputCharAfterComputation);
+            fprintf(output, "%c", inputCharAfterComputation);
             encryptionIndex++;
         }
         else
         {
-            inputcharCompute = (inputChar >= LOWER_CASE_LOW_BOUND && inputChar <= LOWER_CASE_HIGH_BOUND) ? \
+            inputCharAfterComputation = (inputChar >= LOWER_CASE_LOW_BOUND && inputChar <= LOWER_CASE_HIGH_BOUND) ? \
              inputChar - LOWER_CASE_TO_HIGHER_CASE_DIFF : inputChar;
-            debugCompute(debugOutput, isInDebug, inputChar, inputcharCompute);
-            fprintf(output, "%c", inputcharCompute);
+            debugCompute(debugOutput, isInDebug, inputChar, inputCharAfterComputation);
+            fprintf(output, "%c", inputCharAfterComputation);
         }
     }
-    fclose(output);
-    fclose(input);
 }
