@@ -4,7 +4,7 @@
 
 #define ENCRYPT_LOWER_BOUND 0x20
 #define ENCRYPT_UPPER_BOUND 0x7E
-
+#define ESTIMATED_MENU_BOUND 1000
 struct fun_desc
 {
     char *name;
@@ -108,7 +108,7 @@ int getBoundary(struct fun_desc *menu)
     int i;
     for (i = 0; 1; i++)
     {
-        if (menu[i].name == NULL || menu[i].fun == NULL || i > 10000)
+        if (menu[i].name == NULL || menu[i].fun == NULL || i > ESTIMATED_MENU_BOUND)
         {
             return i;
         }
@@ -121,7 +121,9 @@ int main(int argc, char **argv)
     char a[arrSize];
     a[0] = '\0';
     char *carray = a;
-    struct fun_desc menu[] = {{"Censor", censor}, {"Encrypt", encrypt}, {"Decrypt", decrypt}, {"Print dec", dprt}, {"Print string", cprt}, {"Get string", my_get}, {"Quit", quit}, {NULL, NULL}};
+    char *pointerHolder;
+    struct fun_desc menu[] = {{"Censor", censor}, {"Encrypt", encrypt}, {"Decrypt", decrypt}, {"Print dec", dprt},\
+     {"Print string", cprt}, {"Get string", my_get}, {"Quit", quit}, {NULL, NULL}};
     boundary = getBoundary(menu);
     while (1)
     {
@@ -138,7 +140,12 @@ int main(int argc, char **argv)
             printf("Not within bounds\n");
             break;
         }
-        carray = map(carray, arrSize, menu[input].fun);
+        pointerHolder = map(carray, arrSize, menu[input].fun);
+        if (carray != a)
+        {
+            free(carray);
+        }
+        carray = pointerHolder;
         printf("DONE.\n\n");
     }
     if (carray != a)
