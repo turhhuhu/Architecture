@@ -1,10 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
 #define ENCRYPT_LOWER_BOUND 0x20
-#define ENCRYPT_UPPER_BOUND 0x7E
-#define ESTIMATED_MENU_BOUND 1000
+#define ENCRYPT_UPPER_BOUND 0x7e
+#define ESTIMATED_MAX_MENU_SIZE 1024
+
 struct fun_desc
 {
     char *name;
@@ -78,8 +78,8 @@ char quit(char c)
 
 char *map(char *array, int array_length, char (*f)(char))
 {
-    int i;
     char *mapped_array = (char *)(malloc(array_length * sizeof(char)));
+    int i;
     for (i = 0; i < array_length; i++)
     {
         mapped_array[i] = (*f)(array[i]);
@@ -87,12 +87,25 @@ char *map(char *array, int array_length, char (*f)(char))
     return mapped_array;
 }
 
-void print_menu(struct fun_desc *menu)
+int getBoundary(struct fun_desc *menu)
 {
     int i;
-    for (i = 0; 1; i++)
+    for (i = 0; i < ESTIMATED_MAX_MENU_SIZE; i++)
     {
-        if (menu[i].name != NULL && menu[i].fun != NULL)
+        if (menu[i].name == NULL || menu[i].fun == NULL)
+        {
+            return i;
+        }
+    }
+    return 0; // for the compiler warning
+}
+
+void print_menu (struct fun_desc *menu)
+{
+    int i;
+    for(i = 0; i < ESTIMATED_MAX_MENU_SIZE; i++)
+    {
+        if(menu[i].name != NULL && menu[i].fun != NULL)
         {
             printf("%d) %s\n", i, menu[i].name);
         }
@@ -103,34 +116,21 @@ void print_menu(struct fun_desc *menu)
     }
 }
 
-int getBoundary(struct fun_desc *menu)
-{
-    int i;
-    for (i = 0; 1; i++)
-    {
-        if (menu[i].name == NULL || menu[i].fun == NULL || i > ESTIMATED_MENU_BOUND)
-        {
-            return i;
-        }
-    }
-}
-
 int main(int argc, char **argv)
 {
-    int boundary, input = -1, arrSize = 5;
-    char a[arrSize];
+    int boundary, input = -1, arrsize = 5;
+    char a[arrsize];
     a[0] = '\0';
     char *carray = a;
     char *pointerHolder;
-    struct fun_desc menu[] = {{"Censor", censor}, {"Encrypt", encrypt}, {"Decrypt", decrypt}, {"Print dec", dprt},\
-     {"Print string", cprt}, {"Get string", my_get}, {"Quit", quit}, {NULL, NULL}};
+    struct fun_desc menu[] = {{"Censor", censor}, {"Encrypt", encrypt}, {"Decrypt", decrypt}, {"Print dec", dprt}, {"Print string", cprt}, {"Get string", my_get}, {"Quit", quit}, {NULL, NULL}};
     boundary = getBoundary(menu);
-    while (1)
+    while(1)
     {
         printf("Please choose a function: \n");
         print_menu(menu);
         scanf("%d", &input);
-        getchar(); //flushing new line right after getting the int.
+        getchar(); //flushing the '\n' from stdin after getting the int.
         if (input >= 0 && input <= boundary)
         {
             printf("Within bounds\n");
@@ -138,9 +138,8 @@ int main(int argc, char **argv)
         else
         {
             printf("Not within bounds\n");
-            break;
         }
-        pointerHolder = map(carray, arrSize, menu[input].fun);
+        pointerHolder = map(carray, arrsize, menu[input].fun);
         if (carray != a)
         {
             free(carray);
@@ -148,9 +147,11 @@ int main(int argc, char **argv)
         carray = pointerHolder;
         printf("DONE.\n\n");
     }
-    if (carray != a)
+
+    if(carray != a)
     {
         free(carray);
     }
+
     return 0;
 }
