@@ -11,17 +11,15 @@ do_Str:                        		; do_Str function definition - functions are de
         mov ecx, dword [ebp+8]		; get function argument on stack
 					; now ecx register points to the input string
 	yourCode:			; use label to build a loop for treating the input string characters
-
 		cmp byte [ecx], 32
-        jnz notSpace
-        inc byte [an]
-        mov byte [ecx], '_'
-        notSpace:
-        cmp byte [ecx], 9
-        jnz end
-        inc byte [an]
-        mov byte [ecx], '_'      
-
+                jnz notSpace
+                inc byte [an]
+                mov byte [ecx], '_'
+                notSpace:
+                cmp byte [ecx], 9
+                jnz end
+                inc byte [an]
+                mov byte [ecx], '_'      
         end:
 		inc ecx      	    	; increment ecx value; now ecx points to the next character of the string
 		cmp byte [ecx], 0   	; check if the next character (character = byte) is zero (i.e. null string termination)
