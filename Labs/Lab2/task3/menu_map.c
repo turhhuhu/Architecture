@@ -139,7 +139,7 @@ int main(int argc, char **argv)
         {
             printf("Not within bounds\n");
         }
-        pointerHolder = map(carray, arrsize, menu[input].fun);
+        *(menu[input].fun);
         if (carray != a)
         {
             free(carray);

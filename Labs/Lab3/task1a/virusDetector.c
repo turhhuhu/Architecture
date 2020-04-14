@@ -9,6 +9,15 @@ typedef struct virus
     unsigned char *sig;
 } virus;
 
+void printHex(unsigned char* sig, FILE *output, int size)
+{
+    int i;
+    for (i = 0; i < size; i++)
+    {
+        fprintf(output, "%X ", sig[i]);
+    }
+}
+
 virus *readVirus(FILE *buffer)
 {
     if (!feof(buffer))
@@ -20,7 +29,6 @@ virus *readVirus(FILE *buffer)
             free(virusPtr);
             return NULL;
         }
-        printf("%d\n", virusPtr -> SigSize);
         size = virusPtr->SigSize;
         virusPtr->sig = (unsigned char *)malloc(size);
         fread(virusPtr->sig, 1, size, buffer);
@@ -38,7 +46,8 @@ void printVirus(virus *virus, FILE *output)
     fprintf(output, "%d", virus->SigSize);
     fputc('\n', output);
     fputs("signature:\n", output);
-    fwrite(virus->sig, 1, virus->SigSize, output);
+    printHex(virus -> sig, output, virus->SigSize);
+    //fwrite(virus->sig, 1, virus->SigSize, output);
 }
 
 int main(int argc, char **argv)
@@ -62,6 +71,7 @@ int main(int argc, char **argv)
         v = readVirus(buffer);
         if (v != NULL)
         {
+            fputc('\n', output);
             fputc('\n', output);
             printVirus(v, output); 
             free(v -> sig);
