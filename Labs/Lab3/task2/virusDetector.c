@@ -6,6 +6,7 @@
 #define MAX_INPUT_SIZE 1024
 #define BUFFER_MAX_SIZE 10000
 #define SIG_SIZE_PLUS_VIRUS_NAME 18
+#define NOP 0x90
 
 typedef struct virus
 {
@@ -82,22 +83,33 @@ link *list_append(link *virus_list, virus *data)
 {
     link *newLink = NULL;
     link *head = virus_list;
+    newLink = (link *)malloc(sizeof(link));
+    newLink->vir = data;
+    newLink->nextVirus = NULL;
     if (virus_list == NULL)
     {
-        newLink = (link *)malloc(sizeof(link));
-        newLink->vir = data;
-        newLink->nextVirus = NULL;
         return newLink;
     }
     while (virus_list->nextVirus != NULL)
     {
         virus_list = virus_list->nextVirus;
     }
-    newLink = (link *)malloc(sizeof(link));
-    newLink->vir = data;
-    newLink->nextVirus = NULL;
     virus_list->nextVirus = newLink;
     return head;
+}
+
+link *list_append_start(link *virus_list, virus *data)
+{
+    link *newLink = NULL;
+    newLink = (link *)malloc(sizeof(link));
+    newLink->vir = data;
+    if (virus_list == NULL)
+    {
+        newLink->nextVirus = NULL;
+        return newLink;
+    }
+    newLink->nextVirus = virus_list;
+    return newLink;
 }
 
 virus *readVirus(FILE *buffer)
@@ -113,7 +125,11 @@ virus *readVirus(FILE *buffer)
         }
         size = virusPtr->SigSize;
         virusPtr->sig = (unsigned char *)malloc(size);
-        fread(virusPtr->sig, 1, size, buffer);
+        if(fread(virusPtr->sig, 1, size, buffer) != size){
+            free(virusPtr);
+            free(virusPtr -> sig);
+            return NULL;
+        }
         return virusPtr;
     }
     return NULL;
@@ -123,8 +139,9 @@ FILE *loadSignatures()
 {
     char input[SIGNATURES_MAX_FILE_SIZE];
     char fileName[SIGNATURES_MAX_FILE_SIZE];
+    printf("enter signature name:\n");
     fgets(input, SIGNATURES_MAX_FILE_SIZE, stdin);
-    sscanf(input, "%s *[^\n]", fileName);
+    sscanf(input, "%s", fileName);
     return fopen(fileName, "r");
 }
 
@@ -147,14 +164,6 @@ link *createVirusList(FILE *buffer)
 {
     link *head = NULL;
     virus *v = NULL;
-    if (!feof(buffer))
-    {
-        v = readVirus(buffer);
-        if (v != NULL)
-        {
-            head = list_append(head, v);
-        }
-    }
     while (!feof(buffer))
     {
         v = readVirus(buffer);
@@ -212,7 +221,7 @@ void kill_virus(char *fileName, int signitureOffset, int signitureSize)
     fseek(buffer, signitureOffset, SEEK_SET);
     for (i = 0; i< signitureSize; i++)
     {
-        nopArray[i] = 0x90;
+        nopArray[i] = NOP;
     }
     fwrite(nopArray, 1, signitureSize, buffer);
     fclose(buffer);
@@ -235,7 +244,7 @@ int main(int argc, char **argv)
         printf("please choose a function: \n");
         printMenu();
         fgets(inputAsString, MAX_INPUT_SIZE, stdin);
-        sscanf(inputAsString, "%d *[^\n]", &input);
+        sscanf(inputAsString, "%d", &input);
         switch (input)
         {
         case 1:
@@ -270,10 +279,10 @@ int main(int argc, char **argv)
         case 4:
             printf("enter signature offset: \n");
             fgets(inputAsString, MAX_INPUT_SIZE, stdin);
-            sscanf(inputAsString, "%d *[^\n]", &sigOffset);
+            sscanf(inputAsString, "%d", &sigOffset);
             printf("enter signature size: \n");
             fgets(inputAsString, MAX_INPUT_SIZE, stdin);
-            sscanf(inputAsString, "%d *[^\n]", &sigSize);
+            sscanf(inputAsString, "%d", &sigSize);
             kill_virus(infectedFIle, sigOffset, sigSize);
             break;
         case 5:
