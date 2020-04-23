@@ -34,27 +34,28 @@ convertor:
 		jmp for_loop
 	end_loop:
 
-	mov ebx ,0 ;temp
-	mov edx, 0 ;index an
-	mov ecx, 0
+	; eax contains the number to convert to hex, in decimal value
+	mov ebx ,0 ; temp
+	mov edx, 0 ; "an" index
+	mov ecx, 0 ; pointer to the hex string
 	for_loop_hexa:
-		mov ecx, hexStr
-		cmp byte [index], 8
-		jge end_loop_hexa
-		mov bl, al
-		and bl, 00001111b
-		cmp bl, 0
-		jz end_loop_hexa
-		add ecx, ebx
-		mov ecx, [ecx]
-		mov edx, [index]
-		add edx, an
-		mov [edx], ecx
-		shr eax, 4
-		inc byte [index]
-		jmp for_loop_hexa
+		mov ecx, hexStr ; making ecx point to the start of the hex string
+		cmp byte [index], 8 ;checking we run not more than 8 times (eax size)
+		jge end_loop_hexa ; if we did jump to the end of the loop
+		mov bl, al ; moving the 8 bytes from al (start of eax) to bl
+		and bl, 00001111b ; making sure bl has only the 4 bit at the start of al(to transfom to hex)
+		cmp bl, 0 ; this is wrong!!! there could be a number that is represneted in eax as such: 100000000001
+		jz end_loop_hexa ; same as above
+		add ecx, ebx ; taking the value from ebx to ecx (ebx equals to the value of bl) and adding it to ecx (hex string pointer)
+		mov ecx, [ecx] ; taking the value of the char at [ecx] and inserting it into ecx  
+		mov edx, [index] ; moving to edx the value of index
+		add edx, an ; adding to edx the pointer of an (an + index)
+		mov [edx], ecx ; moving to the [an + index] the value of the char
+		shr eax, 4 ;shifting eax 4 bits to get the next char
+		inc byte [index] ; incrementing index
+		jmp for_loop_hexa ; jumping to the start
 	end_loop_hexa:
-	mov byte [edx + 1], 0 
+	mov byte [edx + 1], 0 ; making it only hex string
 	push an			; call printf with 2 arguments -  
 	push format_string	; pointer to str and pointer to format string
 	call printf
