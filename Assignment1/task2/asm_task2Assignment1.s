@@ -44,8 +44,6 @@ convertor:
 		jge end_loop_hexa ; if we did jump to the end of the loop
 		mov bl, al ; moving the 8 bytes from al (start of eax) to bl
 		and bl, 00001111b ; making sure bl has only the 4 bit at the start of al(to transfom to hex)
-		cmp bl, 0 ; this is wrong!!! there could be a number that is represneted in eax as such: 100000000001
-		jz end_loop_hexa ; same as above
 		add ecx, ebx ; taking the value from ebx to ecx (ebx equals to the value of bl) and adding it to ecx (hex string pointer)
 		mov ecx, [ecx] ; taking the value of the char at [ecx] and inserting it into ecx  
 		mov edx, [index] ; moving to edx the value of index
@@ -53,9 +51,29 @@ convertor:
 		mov [edx], ecx ; moving to the [an + index] the value of the char
 		shr eax, 4 ;shifting eax 4 bits to get the next char
 		inc byte [index] ; incrementing index
+		cmp eax, 0 ; 
+		jz end_loop_hexa ; 
 		jmp for_loop_hexa ; jumping to the start
 	end_loop_hexa:
+	mov byte [index], 0
 	mov byte [edx + 1], 0 ; making it only hex string
+
+	mov ebx, an
+	mov ecx, 0
+	mov eax, 0
+	reverse_loop:
+		cmp ebx, edx
+		jge end_reverse_loop
+		mov cl, [edx]
+		mov al, [ebx]
+		mov [edx], al
+		mov [ebx], cl
+		inc ebx
+		dec edx
+		jmp reverse_loop
+	end_reverse_loop:
+
+
 	push an			; call printf with 2 arguments -  
 	push format_string	; pointer to str and pointer to format string
 	call printf
