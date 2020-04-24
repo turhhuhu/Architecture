@@ -55,13 +55,13 @@ convertor:
 		jz end_loop_hexa ; 
 		jmp for_loop_hexa ; jumping to the start
 	end_loop_hexa:
-	mov byte [index], 0
-	mov byte [edx + 1], 0 ; making it only hex string
+	mov byte [index], 0 ; reseting index
+	mov byte [edx + 1], 0 ; making it only hex string (adding null termination at the end)
 
 	mov ebx, an
 	mov ecx, 0
 	mov eax, 0
-	reverse_loop:
+	reverse_loop: ;Swaping an to fit little endian with string
 		cmp ebx, edx
 		jge end_reverse_loop
 		mov cl, [edx]
