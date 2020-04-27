@@ -1,11 +1,11 @@
-task1Assignment1: Assignment1.o assembly.o
-	gcc -m32 -Wall -g -o task1Assignment1 Assignment1.o assembly.o
+task1Assignment1: main_task1Assignment1.o asm_task1Assignment1.o
+	gcc -m32 -Wall -g -o task1Assignment1 main_task1Assignment1.o asm_task1Assignment1.o
 
-Assignment1.o: Assignment1.c
-	gcc -m32 -Wall -g -c -o Assignment1.o Assignment1.c
+main_task1Assignment1.o: main_task1Assignment1.c
+	gcc -m32 -Wall -g -c -o main_task1Assignment1.o main_task1Assignment1.c
 
-assembly.o: assembly.s
-	nasm -g -f elf -w+all -o assembly.o assembly.s
+asm_task1Assignment1.o: asm_task1Assignment1.s
+	nasm -g -f elf -w+all -o asm_task1Assignment1.o asm_task1Assignment1.s
 
 
 .PHONY: clean

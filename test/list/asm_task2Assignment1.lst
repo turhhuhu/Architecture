@@ -1,0 +1,86 @@
+     1                                  section .data
+     2 00000000 00                      	index: db 0
+     3                                  	
+     4                                  section	.rodata			; we define (global) read-only variables in .rodata section
+     5 00000000 25730A00                	format_string: db "%s", 10, 0	; format string
+     6 00000004 25640A00                	format: db "%d", 10, 0
+     7 00000008 303132333435363738-     	hexStr: db "0123456789ABCDEF", 0 
+     7 00000011 3941424344454600   
+     8                                  
+     9                                  section .bss			; we define (global) uninitialized variables in .bss section
+    10 00000000 <res 0000000C>          	an: resb 12	; enough to store integer in [-2,147,483,648 (-2^31) : 2,147,483,647 (2^31-1)]
+    11                                  
+    12                                  section .text
+    13                                  	global convertor
+    14                                  	extern printf
+    15                                  	
+    16                                  convertor:
+    17 00000000 55                      	push ebp
+    18 00000001 89E5                    	mov ebp, esp	
+    19 00000003 60                      	pushad			
+    20                                  
+    21 00000004 8B4D08                  	mov ecx, dword [ebp+8]	; get function argument (pointer to string)
+    22 00000007 B800000000              	mov eax, 0
+    23 0000000C BB00000000              	mov ebx, 0
+    24                                  	for_loop: ;converting the string to a decimal number
+    25 00000011 80390A                  		cmp byte [ecx], 10
+    26 00000014 7412                    		jz end_loop
+    27 00000016 803900                  		cmp byte [ecx], 0
+    28 00000019 740D                    		jz end_loop
+    29 0000001B 8A19                    		mov bl, [ecx]
+    30 0000001D 80EB30                  		sub bl, '0'
+    31 00000020 6BC00A                  		imul eax, 10
+    32 00000023 01D8                    		add eax, ebx
+    33 00000025 41                      		inc ecx
+    34 00000026 EBE9                    		jmp for_loop
+    35                                  	end_loop:
+    36                                  
+    37                                  	; eax contains the number to convert to hex, in decimal value
+    38 00000028 BB00000000              	mov ebx ,0 ; temp
+    39 0000002D BA00000000              	mov edx, 0 ; "an" index
+    40 00000032 B900000000              	mov ecx, 0 ; pointer to the hex string
+    41                                  	for_loop_hexa: ;converting the decimal number to hex number
+    42 00000037 B9[08000000]            		mov ecx, hexStr ; making ecx point to the start of the hex string
+    43 0000003C 803D[00000000]08        		cmp byte [index], 8 ;checking we run not more than 8 times (eax size)
+    44 00000043 7D27                    		jge end_loop_hexa ; if we did jump to the end of the loop
+    45 00000045 88C3                    		mov bl, al ; moving the 8 bytes from al (start of eax) to bl
+    46 00000047 80E30F                  		and bl, 00001111b ; making sure bl has only the 4 bit at the start of al(to transfom to hex)
+    47 0000004A 01D9                    		add ecx, ebx ; taking the value from ebx to ecx (ebx equals to the value of bl) and adding it to ecx (hex string pointer)
+    48 0000004C 8B09                    		mov ecx, [ecx] ; taking the value of the char at [ecx] and inserting it into ecx  
+    49 0000004E 8B15[00000000]          		mov edx, [index] ; moving to edx the value of index
+    50 00000054 81C2[00000000]          		add edx, an ; adding to edx the pointer of an (an + index)
+    51 0000005A 890A                    		mov [edx], ecx ; moving to the [an + index] the value of the char
+    52 0000005C C1E804                  		shr eax, 4 ;shifting eax 4 bits to get the next char
+    53 0000005F FE05[00000000]          		inc byte [index] ; incrementing index
+    54 00000065 83F800                  		cmp eax, 0 ; making sure if we finished running through the whole number (if eax is 0 we finished)
+    55 00000068 7402                    		jz end_loop_hexa ; jumping to the end if the above is true
+    56 0000006A EBCB                    		jmp for_loop_hexa ; jumping to the start
+    57                                  	end_loop_hexa:
+    58 0000006C C605[00000000]00        	mov byte [index], 0 ; reseting index
+    59 00000073 C6420100                	mov byte [edx + 1], 0 ; making it only hex string (adding null termination at the end)
+    60                                  
+    61 00000077 BB[00000000]            	mov ebx, an
+    62 0000007C B900000000              	mov ecx, 0
+    63 00000081 B800000000              	mov eax, 0
+    64                                  	reverse_loop: ;Swaping an to fit little endian with string
+    65 00000086 39D3                    		cmp ebx, edx
+    66 00000088 7D0C                    		jge end_reverse_loop
+    67 0000008A 8A0A                    		mov cl, [edx]
+    68 0000008C 8A03                    		mov al, [ebx]
+    69 0000008E 8802                    		mov [edx], al
+    70 00000090 880B                    		mov [ebx], cl
+    71 00000092 43                      		inc ebx
+    72 00000093 4A                      		dec edx
+    73 00000094 EBF0                    		jmp reverse_loop
+    74                                  	end_reverse_loop:
+    75                                  
+    76                                  
+    77 00000096 68[00000000]            	push an			; call printf with 2 arguments -  
+    78 0000009B 68[00000000]            	push format_string	; pointer to str and pointer to format string
+    79 000000A0 E8(00000000)            	call printf
+    80 000000A5 83C408                  	add esp, 8		; clean up stack after call
+    81                                  
+    82 000000A8 61                      	popad
+    83 000000A9 89EC                    	mov esp, ebp	
+    84 000000AB 5D                      	pop ebp
+    85 000000AC C3                      	ret

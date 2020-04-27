@@ -1,0 +1,33 @@
+     1                                  section .rodata
+     2 00000000 25640A00                    format: db "%d", 10, 0
+     3                                  
+     4                                  section .text 
+     5                                      global assFunc
+     6                                      extern printf
+     7                                      extern c_checkValidity
+     8                                      
+     9                                  assFunc:
+    10 00000000 55                          push ebp
+    11 00000001 89E5                        mov ebp, esp
+    12 00000003 FF750C                      push dword [ebp + 12]
+    13 00000006 FF7508                      push dword [ebp + 8]
+    14 00000009 E8(00000000)                call c_checkValidity
+    15 0000000E 83C408                      add esp, 8
+    16 00000011 83F801                      cmp dword eax, 1
+    17 00000014 7508                        jnz smaller
+    18 00000016 8B4D08                      mov dword ecx, [ebp + 8]
+    19 00000019 2B4D0C                      sub dword ecx, [ebp + 12]
+    20 0000001C EB06                        jmp print
+    21                                      smaller:
+    22 0000001E 8B4D08                          mov dword ecx, [ebp + 8]
+    23 00000021 034D0C                          add dword ecx, [ebp + 12]
+    24                                      print:
+    25 00000024 51                          push ecx
+    26 00000025 68[00000000]                push format
+    27 0000002A E8(00000000)                call printf
+    28 0000002F 83C408                      add esp, 8
+    29 00000032 89EC                        mov esp, ebp
+    30 00000034 5D                          pop ebp
+    31 00000035 C3                          ret
+    32                                  
+    33                                  
