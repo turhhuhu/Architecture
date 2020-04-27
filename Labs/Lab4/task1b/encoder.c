@@ -5,6 +5,7 @@
 #define O_WRONLY 1
 #define O_RDWR 2
 #define O_CREAT 64
+#define O_APPEND 1024
 #define  S_IRWXU  00700
 #define O_TRUNC 01000
 #define SYS_EXIT 1
@@ -67,7 +68,7 @@ int main(int argc, char **argv)
         }
         if (strncmp("-o", argv[i], 2) == 0)
         {
-            if ((outputFileDescriptor = system_call(SYS_OPEN, argv[i] + 2, O_RDWR|O_TRUNC|O_CREAT, S_IRWXU)) < 0)
+            if ((outputFileDescriptor = system_call(SYS_OPEN, argv[i] + 2, O_WRONLY|O_TRUNC|O_CREAT, S_IRWXU)) < 0)
             {
                 debug_sys(SYS_OPEN, isInDebugMode, "Error while opening output file ", outputFileDescriptor);
                 system_call(SYS_EXIT, 0x55);
