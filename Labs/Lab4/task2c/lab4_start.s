@@ -1,5 +1,4 @@
 section .rodata
-    msg: db "Hello, Infected File", 10, 0
     nl: db 10 , 0
 section .bss
     fileName: resb 12
@@ -50,6 +49,7 @@ system_call:
     ret                     ; Back to caller
 
 code_start:
+    msg: db "Hello, Infected File", 10, 0
     infection:
         push    ebp             ; Save caller state
         mov     ebp, esp
