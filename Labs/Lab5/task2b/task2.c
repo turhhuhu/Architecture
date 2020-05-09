@@ -4,7 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <linux/limits.h>
-#include <sys/wait.h>
+#include <wait.h>
+#include <sys/types.h>
 #define MAX_INPUT_SIZE 2048
 #define TERMINATED  -1
 #define RUNNING 1
@@ -17,16 +18,96 @@ typedef struct process{
     struct process *next;	                  /* next process in chain */
 } process;
 
+void freeProcessList(process* process_list)
+{
+    if(process_list -> next != NULL)
+    {
+        freeProcessList(process_list -> next);
+    }
+    freeCmdLines(process_list->cmd);
+    free(process_list);
+}
 
+void updateProcessStatus(process* process_list, int pid, int status)
+{
+    process *head = process_list;
+    while(head != NULL && head -> pid != pid)
+    {
+        head = head -> next;
+    }
+    if(head != NULL)
+    {
+        head -> status = status;
+    }
+}
+
+void updateProcessList(process **process_list)
+{
+    int status = 0;
+    process *head = NULL;
+    if(process_list == NULL)
+    {
+        return;
+    }
+    head = *process_list;
+    while(head != NULL)
+    {
+        waitpid(head -> pid, &status, WNOHANG | WUNTRACED);
+        if(WIFSIGNALED(status) || WIFEXITED(status))
+        {
+            updateProcessStatus(*process_list, head -> pid, TERMINATED);
+        }
+        else if(WIFSTOPPED(status))
+        {
+            updateProcessStatus(*process_list, head -> pid, SUSPENDED);
+        }
+        else
+        {
+            updateProcessStatus(*process_list, head -> pid, RUNNING);
+        }
+        head = head -> next;
+    }
+}
+
+void freeTerminatedProcess(process** process_list, int pid)
+{
+    process *head = *process_list;
+    process *beforeHead = *process_list;
+    if(head == NULL)
+    {
+        return;
+    }
+    if(head != NULL && head -> pid == pid)
+    {
+        *process_list = head -> next;
+        freeCmdLines(head -> cmd);
+        free(head);
+        return;
+    }
+    head = head -> next;
+    while(head != NULL && head -> pid != pid)
+    {
+        head = head -> next;
+        beforeHead = beforeHead -> next;
+    }
+    if(head != NULL)
+    {
+        beforeHead -> next = head -> next;
+        freeCmdLines(head -> cmd);
+        free(head);
+    }
+}
 
 void printProcessList(process** process_list)
 {
     process* head = *process_list;
+    process* processHolder = NULL;
     if(head == NULL)
     {
         printf("no running process\n");
         return;
     }
+    updateProcessList(process_list);
     int i;
     int status;
     char *statusAsString = NULL;
@@ -36,13 +117,19 @@ void printProcessList(process** process_list)
         status = head -> status;
         statusAsString = status == TERMINATED ? "Terminated" : status == RUNNING ? "Running" : "Suspended";
         printf("%d)      %d    %s                       %s\n", i, head->pid, *(head->cmd->arguments), statusAsString);
-        head = head -> next;
+        processHolder = head -> next;
+        if(status == TERMINATED)
+        {
+            freeTerminatedProcess(process_list, head -> pid);
+        }
+        head = processHolder;
     }
 }
 
+
 void addProcess(process** process_list, cmdLine* cmd, pid_t pid)
 {
-    process* nextProcess = malloc(sizeof(process));
+    process* nextProcess = (process*)malloc(sizeof(process));
     nextProcess -> cmd = cmd;
     nextProcess -> pid = pid;
     nextProcess -> status = RUNNING;
@@ -70,11 +157,13 @@ void execute(cmdLine *pCmdLine, char isInDebugMode, process** processList)
         {
             perror("error when using chdir");
         }
+        freeCmdLines(pCmdLine);
         return;
     }
     if(strcmp("procs", pCmdLine->arguments[0]) == 0)
     {
         printProcessList(processList);
+        freeCmdLines(pCmdLine);
         return;
     }
     int pid = fork();
@@ -114,7 +203,7 @@ int main(int argc, char **argv)
     char cwd[PATH_MAX];
     char input[MAX_INPUT_SIZE];
     cmdLine *head = NULL;
-    process** processList = malloc(sizeof(process*));
+    process** processList = (process**)malloc(sizeof(process*));
     *processList = NULL;
     char isInDebugMode = 0;
     int i;
@@ -137,6 +226,14 @@ int main(int argc, char **argv)
         }
         head = parseCmdLines(input);
         execute(head, isInDebugMode, processList);
+    }
+    if(processList != NULL)
+    {
+        if(*processList != NULL)
+        {
+            freeProcessList(*processList);
+        }
+        free(processList);
     }
 
     return 0;
