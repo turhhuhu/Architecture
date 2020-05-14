@@ -42,7 +42,7 @@ convertor:
 		mov ecx, hexStr ; making ecx point to the start of the hex string
 		cmp byte [index], 8 ;checking we run not more than 8 times (eax size)
 		jge end_loop_hexa ; if we did jump to the end of the loop
-		mov bl, al ; moving the 8 bytes from al (start of eax) to bl
+		mov bl, al ; moving the 8 bits from al (start of eax) to bl
 		and bl, 00001111b ; making sure bl has only the 4 bit at the start of al(to transfom to hex)
 		add ecx, ebx ; taking the value from ebx to ecx (ebx equals to the value of bl) and adding it to ecx (hex string pointer)
 		mov ecx, [ecx] ; taking the value of the char at [ecx] and inserting it into ecx  
