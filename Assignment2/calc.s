@@ -11,13 +11,35 @@ section .text
 
 %define NODE_SIZE 5
 section .data
-    head: dd -1
-    headP: dd head
+    ; head: dd -1
+    ; headP: dd head
     strp: db "7D12", 0
+    strp1: db "8DF2", 0
+    p: dd 0
 
 section .rodata
     format: db "%d" , 10, 0
     hex_format: db "%X", 0
+    str_format: db "%s", 0
+
+%macro createListAndPush 1
+    jmp %%skip
+section .data
+    %%head: dd -1
+    %%headP: dd %%head
+section .text
+    %%skip:
+    push %%headP
+    push %1
+    call createListFromHexString
+    add esp, 8
+    pusha
+    mov eax, [%%headP]
+    push eax
+    call printList
+    add esp, 4
+    popa
+%endmacro
 
 %macro hexCharConvertor 1
     cmp %1, 65
@@ -41,28 +63,27 @@ main:
     mov ebp, esp
     pushad
 
-    push 0x7D
-    push headP
-    call addToList
-    add esp, 8
+    ; push 0x7D
+    ; push headP
+    ; call addToList
+    ; add esp, 8
 
-    push 0x12
-    push headP
-    call addToList
-    add esp, 8
+    ; push 0x12
+    ; push headP
+    ; call addToList
+    ; add esp, 8
 
-    push strp
-    call createListFromHexString
-    add esp, 4
+ 
+    mov eax, strp
+    createListAndPush eax
 
-    mov eax, [eax]
-    push eax
-    call printList
-    add esp, 4
+    mov eax, strp1
+    createListAndPush eax
 
-    push headP
-    call freeList
-    add esp, 4
+
+    ; push headP
+    ; call freeList
+    ; add esp, 4
     
     popad
     pop ebp
@@ -71,8 +92,9 @@ main:
 createListFromHexString:
     push ebp 
     mov ebp, esp
-
+    
     mov eax, [ebp + 8]
+    mov edx, [ebp + 12]
     .for_loop:
         cmp byte [eax], 0
         jz .end
@@ -86,29 +108,29 @@ createListFromHexString:
         mov bl, [eax + 1]
         hexCharConvertor bl
         add cl, bl
+        pusha
         push ecx
-        push headPF
+        push edx
         call addToList
         add esp, 8
+        popa
         add eax, 2
-        mov edx, 0
         jmp .for_loop
 
     .one_digit:
         mov ebx, 0
         mov byte bl, [eax]
         hexCharConvertor bl
+        pusha
         push ebx
-        push headPF
+        push edx
         call addToList
         add esp, 8
+        popa
         add eax, 1
         jmp .for_loop
 
     .end:
-    
-
-    mov eax, headPF
     pop ebp
     ret
 
@@ -152,6 +174,16 @@ freeList:
         jmp .freeLoop
     .endFreeLoop:
 
+    ; push eax
+    ; call free
+    ; add esp, 4
+
+    ; mov eax, [ebp + 8]
+    ; push eax
+    ; call free
+    ; add esp, 4
+
+    
     popad
     pop ebp
     ret
@@ -205,7 +237,6 @@ printListReverse:
         mov eax, [eax + 1]
         jmp .printLoop
     .endPrintLoop:
-
     popad
     pop ebp
     ret
