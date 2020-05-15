@@ -9,4 +9,4 @@ lineParser.o: LineParser.c
 .PHONY: clean
 
 clean:
-	rm -f *.o task1
+	rm -f *.o task2
