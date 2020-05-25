@@ -56,9 +56,11 @@ section .rodata
 ;; DO NOT USE EDX AS PUSH ARGUMENT
 %macro pushOp 1
     pushad
+    push eax
     isFullOpStack
     cmp eax, 0
     jne %%pusherr
+    pop eax
     mov edx, [opsp]
     mov [edx], %1
     add edx, 4
@@ -66,6 +68,7 @@ section .rodata
     jmp %%pushend
     %%pusherr:
         printErr "Error: Operand Stack Overflow"
+        pop eax
     %%pushend:
     popad
 %endmacro
@@ -73,7 +76,6 @@ section .rodata
 ;; this macro changes edx!!!
 ;; DO NOT USE EDX AS POP ARGUMENT
 %macro popOp 1
-    pushad
     isEmptyOpStack
     cmp eax, 0
     jne %%poperr
@@ -85,25 +87,29 @@ section .rodata
     %%poperr:
         printErr "Error: Insufficient Number of Arguments on Stack"
     %%popend:
-    popad
 %endmacro
 
-%macro createListAndPush 1
+%macro createList 0
     jmp %%skip
 section .data
-    %%head: dd -1
-    %%headP: dd %%head
+    %%headP: dd 0
 section .text
     %%skip:
-    push %%headP
+    mov eax, %%headP
+%endmacro
+
+
+%macro createListAndPush 1
+    pushad
+    createList
+    mov ebx, eax
+    pushad
+    push eax
     push %1
     call createListFromHexString
     add esp, 8
-    pushad
-    mov eax, [%%headP]
-    push eax
-    call printList
-    add esp, 4
+    popad
+    pushOp ebx
     popad
 %endmacro
 
@@ -158,24 +164,85 @@ main:
     ;; eax now has decimal stack size
     .initStack:
     mov [size], eax
+    ; mov eax, 5
+    ; pushOp eax
+    ; mov eax, 2
+    ; pushOp eax
+    ; popOp eax
+    ; printfMacro eax, format
+    ; popOp eax
+    ; printfMacro eax, format
 
-    calc_loop:
-    pushad
-    push dword [stdin]
-    push MAX_USER_INPUT
-    push inputBuffer
-    call fgets
-    add esp, 12
-    popad
-    
-    createListAndPush inputBuffer
-    
-    end_calc_loop:
+    ; createListAndPush strp1
+    ; createListAndPush strp1
+    ; popOp eax
+    ; printfMacro eax, format
+    ; mov eax, [eax]
+    ; push eax
+    ; call printList
+    ; add esp, 4
+    ; popOp eax
+    ; printfMacro eax, format
+
+    ; mov eax, [eax]
+    ; push eax
+    ; call printList
+    ; add esp, 4
+
+
+    mov ecx, 3
+    top:
+    cmp ecx, 0
+    je end_test
+    createListAndPush strp1
+    sub ecx, 1
+    jmp top
+    end_test:
+    popOp eax
+    mov eax, [eax]
+    push eax
+    call printList
+    add esp,4
+    popOp eax
+    mov eax, [eax]
+    push eax
+    call printList
+    add esp,4
+    popOp eax
+    mov eax, [eax]
+    push eax
+    call printList
+    add esp,4
+    ; calc_loop:
+    ; mov dword [inputBuffer], 0
+    ; push dword [stdin]
+    ; push MAX_USER_INPUT
+    ; push inputBuffer
+    ; call fgets
+    ; add esp, 12
+    ; createListAndPush strp1
+    ; cmp byte [inputBuffer], 'q'
+    ; je end_calc_loop
+    ; cmp byte [inputBuffer], 'p'
+    ; jne loop_cont
+    ; popOp eax
+    ; printfMacro eax, format
+    ; mov eax, [eax]
+    ; push eax
+    ; call printList
+    ; add esp, 4
+    ; jmp calc_loop
+    ; loop_cont:
+    ; jmp calc_loop
+    ; end_calc_loop:
 
 
     popad
     pop ebp
     ret
+
+duplicate:
+    
 
 strToDecimal:
     push ebp
@@ -223,7 +290,7 @@ createListFromHexString:
 
     mov eax, [ebp + 8]
     cmp ebx, 0
-    je .Even
+    je .endCmp
     mov ebx, 0
     mov byte bl, [eax]
     hexCharConvertor bl
@@ -235,9 +302,7 @@ createListFromHexString:
     popad
     add eax, 1
     jmp .endCmp
-    .Even:
     
-
     .endCmp:
 
 
@@ -278,10 +343,18 @@ addToList:
     mov ebx, [ebp + 12]
     mov byte [eax], bl
     mov dword ebx, [ebp + 8]
+
+    cmp ebx, 0
+    jne .existingList
+    mov dword [eax + 1], 0
+    mov [ebx], eax
+    jmp .end
+    .existingList:
     mov dword ebx, [ebx]
     mov dword [eax + 1], ebx   
     mov ebx, [ebp + 8]
     mov [ebx], eax
+    .end:
 
     popad
     pop ebp
@@ -295,7 +368,7 @@ freeList:
     mov eax, [ebp + 8]
     mov eax, [eax]
     .freeLoop:
-        cmp byte [eax], -1
+        cmp eax, 0
         je .endFreeLoop
         mov ebx, [eax + 1]
         pushad
@@ -361,7 +434,7 @@ printList:
     pushad
 
     mov eax, [ebp + 8]
-    cmp byte [eax], -1
+    cmp eax, 0
     je .end
     mov ebx, [eax + 1]
     push ebx
@@ -389,7 +462,7 @@ printListReverse:
     mov eax, [ebp + 8]
     mov eax, [eax]
     .printLoop:
-        cmp byte [eax], -1
+        cmp eax, 0
         je .endPrintLoop
         mov ebx, 0
         mov bl, [eax]
