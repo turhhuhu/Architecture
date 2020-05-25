@@ -16,11 +16,76 @@ section .data
     strp: db "7D12", 0
     strp1: db "8DF2", 0
     p: dd 0
+    opsp: dd opStack
+
+section .bss
+    opStack: resd 256
+    size: resd 1
 
 section .rodata
     format: db "%d" , 10, 0
     hex_format: db "%X", 0
-    str_format: db "%s", 0
+    str_format: db "%s",10, 0
+
+%macro isFullOpStack 0
+    push ebx
+    mov ebx, [size]
+    imul ebx, 4
+    add ebx, opStack
+    mov eax, 0
+    cmp ebx, [opsp]
+    jne %%nfull
+    mov eax, 1
+    %%nfull:
+    pop ebx
+%endmacro
+
+%macro isEmptyOpStack 0
+    push ebx
+    mov ebx, opStack
+    mov eax, 0
+    cmp ebx, [opsp]
+    jne %%nempty
+    mov eax, 1
+    %%nempty:
+    pop ebx
+%endmacro
+
+;; this macro changed edx!!!
+;; DO NOT USE EDX AS PUSH ARGUMENT
+%macro pushOp 1
+    push eax
+    isFullOpStack
+    cmp eax, 0
+    jne %%pusherr
+    mov edx, [opsp]
+    mov [edx], %1
+    add edx, 4
+    mov [opsp], edx
+    jmp %%pushend
+    %%pusherr:
+        printErr "Error: Operand Stack Overflow"
+    %%pushend:
+    pop eax
+%endmacro
+
+;; this macro changed edx!!!
+;; DO NOT USE EDX AS POP ARGUMENT
+%macro popOp 1
+    push eax
+    isEmptyOpStack
+    cmp eax, 0
+    jne %%poperr
+    mov edx, [opsp]
+    sub edx, 4
+    mov [opsp], edx
+    mov %1, [edx]
+    jmp %%popend
+    %%poperr:
+        printErr "Error: Insufficient Number of Arguments on Stack"
+    %%popend:
+    pop eax
+%endmacro
 
 %macro createListAndPush 1
     jmp %%skip
@@ -49,6 +114,20 @@ section .text
     sub %1, '0'
 %endmacro
 
+%macro printErr 1
+jmp %%skip_print
+section .data
+    %%str_to_print: db %1, 0
+section .text
+    %%skip_print:
+    pusha
+    push %%str_to_print
+    push str_format
+    call printf
+    add esp, 8
+    popa
+%endmacro
+
 %macro printfMacro 2
     pusha
     push %1
@@ -62,6 +141,27 @@ main:
     push ebp 
     mov ebp, esp
     pushad
+
+    mov eax, 0
+    mov eax, [ebp + 8] ;; eax holds argc
+    cmp eax, 2
+    jge .userOpStackSizeInput
+    mov eax, 5 ;; eax holds default stack size
+    jmp .initStack
+    .userOpStackSizeInput:
+    mov eax, [ebp + 12] ;; argv
+    mov eax, [eax + 4] ;; eax holds user string operand stack size
+    push eax
+    call strToDecimal
+    add esp, 4
+    ;; eax now has decimal stack size
+    .initStack:
+    mov [size], eax
+    pushOp ebx
+    pushOp ebx
+    mov eax, [size]
+
+    
 
     ; push 0x7D
     ; push headP
@@ -88,6 +188,29 @@ main:
     popad
     pop ebp
     ret
+
+strToDecimal:
+    push ebp
+    mov ebp, esp
+
+    mov ecx, dword [ebp+8]
+	mov eax, 0
+	mov ebx, 0
+	for_loop: ;converting the string to a decimal number
+		cmp byte [ecx], 10
+		jz end_loop
+		cmp byte [ecx], 0
+		jz end_loop
+		mov bl, [ecx]
+		sub bl, '0'
+		imul eax, 10
+		add eax, ebx
+		inc ecx
+		jmp for_loop
+	end_loop:
+
+    pop ebp
+    ret   
 
 createListFromHexString:
     push ebp 
