@@ -8,12 +8,12 @@ section .text
   extern free 
   extern getchar 
   extern fgets
-
+  extern stdin
+  
 %define NODE_SIZE 5
+%define MAX_USER_INPUT 80
 section .data
-    ; head: dd -1
-    ; headP: dd head
-    strp: db "7D12", 0
+    strp: db "ABCD", 0
     strp1: db "8DF2", 0
     p: dd 0
     opsp: dd opStack
@@ -21,11 +21,12 @@ section .data
 section .bss
     opStack: resd 256
     size: resd 1
+    inputBuffer: resb MAX_USER_INPUT
 
 section .rodata
     format: db "%d" , 10, 0
     hex_format: db "%X", 0
-    str_format: db "%s",10, 0
+    str_format: db "%s", 0
 
 %macro isFullOpStack 0
     push ebx
@@ -51,10 +52,10 @@ section .rodata
     pop ebx
 %endmacro
 
-;; this macro changed edx!!!
+;; this macro changes edx!!!
 ;; DO NOT USE EDX AS PUSH ARGUMENT
 %macro pushOp 1
-    push eax
+    pushad
     isFullOpStack
     cmp eax, 0
     jne %%pusherr
@@ -66,13 +67,13 @@ section .rodata
     %%pusherr:
         printErr "Error: Operand Stack Overflow"
     %%pushend:
-    pop eax
+    popad
 %endmacro
 
-;; this macro changed edx!!!
+;; this macro changes edx!!!
 ;; DO NOT USE EDX AS POP ARGUMENT
 %macro popOp 1
-    push eax
+    pushad
     isEmptyOpStack
     cmp eax, 0
     jne %%poperr
@@ -84,7 +85,7 @@ section .rodata
     %%poperr:
         printErr "Error: Insufficient Number of Arguments on Stack"
     %%popend:
-    pop eax
+    popad
 %endmacro
 
 %macro createListAndPush 1
@@ -98,12 +99,12 @@ section .text
     push %1
     call createListFromHexString
     add esp, 8
-    pusha
+    pushad
     mov eax, [%%headP]
     push eax
     call printList
     add esp, 4
-    popa
+    popad
 %endmacro
 
 %macro hexCharConvertor 1
@@ -120,21 +121,21 @@ section .data
     %%str_to_print: db %1, 0
 section .text
     %%skip_print:
-    pusha
+    pushad
     push %%str_to_print
     push str_format
     call printf
     add esp, 8
-    popa
+    popad
 %endmacro
 
 %macro printfMacro 2
-    pusha
+    pushad
     push %1
     push %2
     call printf
     add esp, 8
-    popa
+    popad
 %endmacro
 
 main:
@@ -157,34 +158,21 @@ main:
     ;; eax now has decimal stack size
     .initStack:
     mov [size], eax
-    pushOp ebx
-    pushOp ebx
-    mov eax, [size]
 
+    calc_loop:
+    pushad
+    push dword [stdin]
+    push MAX_USER_INPUT
+    push inputBuffer
+    call fgets
+    add esp, 12
+    popad
     
-
-    ; push 0x7D
-    ; push headP
-    ; call addToList
-    ; add esp, 8
-
-    ; push 0x12
-    ; push headP
-    ; call addToList
-    ; add esp, 8
-
- 
-    mov eax, strp
-    createListAndPush eax
-
-    mov eax, strp1
-    createListAndPush eax
-
-
-    ; push headP
-    ; call freeList
-    ; add esp, 4
+    createListAndPush inputBuffer
     
+    end_calc_loop:
+
+
     popad
     pop ebp
     ret
@@ -210,7 +198,8 @@ strToDecimal:
 	end_loop:
 
     pop ebp
-    ret   
+    ret
+    
 
 createListFromHexString:
     push ebp 
@@ -218,11 +207,45 @@ createListFromHexString:
     
     mov eax, [ebp + 8]
     mov edx, [ebp + 12]
+
+    mov ebx, 0
+    .checkEven:
+    cmp byte [eax], 0
+    jz .endCheckEven
+    cmp byte [eax], 10
+    jz .endCheckEven
+    mov ecx, 1
+    sub ecx, ebx
+    mov ebx, ecx
+    add eax, 1
+    jmp .checkEven
+    .endCheckEven:
+
+    mov eax, [ebp + 8]
+    cmp ebx, 0
+    je .Even
+    mov ebx, 0
+    mov byte bl, [eax]
+    hexCharConvertor bl
+    pushad
+    push ebx
+    push edx
+    call addToList
+    add esp, 8
+    popad
+    add eax, 1
+    jmp .endCmp
+    .Even:
+    
+
+    .endCmp:
+
+
     .for_loop:
         cmp byte [eax], 0
         jz .end
-        cmp byte [eax + 1], 0
-        jz .one_digit
+        cmp byte [eax], 10
+        jz .end
         mov ecx, 0
         mov byte cl, [eax]
         hexCharConvertor cl
@@ -231,26 +254,13 @@ createListFromHexString:
         mov bl, [eax + 1]
         hexCharConvertor bl
         add cl, bl
-        pusha
+        pushad
         push ecx
         push edx
         call addToList
         add esp, 8
-        popa
+        popad
         add eax, 2
-        jmp .for_loop
-
-    .one_digit:
-        mov ebx, 0
-        mov byte bl, [eax]
-        hexCharConvertor bl
-        pusha
-        push ebx
-        push edx
-        call addToList
-        add esp, 8
-        popa
-        add eax, 1
         jmp .for_loop
 
     .end:
@@ -288,11 +298,11 @@ freeList:
         cmp byte [eax], -1
         je .endFreeLoop
         mov ebx, [eax + 1]
-        pusha
+        pushad
         push eax
         call free
         add esp, 4
-        popa
+        popad
         mov eax, ebx
         jmp .freeLoop
     .endFreeLoop:
@@ -310,8 +320,41 @@ freeList:
     popad
     pop ebp
     ret
+printListWithoutLeadingZeros:
+    push ebp
+    mov ebp, esp
+    pushad
 
+    mov eax, [ebp + 8]
+    mov ebx, 0
+    mov ecx, 0
+    mov bl, [eax]
+    mov cl, bl
+    and cl, 00001111b
+    shr bl ,4
+    cmp ebx, 0
+    jne .printHalfByte
+    pushad
+    push eax
+    call printList
+    add esp, 4
+    popad
+    jmp .end
 
+    .printHalfByte:
+    mov eax, [eax + 1]
+    pushad
+    push eax
+    call printList
+    add esp, 4
+    popad
+    printfMacro ecx, hex_format
+    .end:
+
+    popad
+    pop ebp
+    ret
+    
 printList:
     push ebp
     mov ebp, esp
@@ -325,14 +368,13 @@ printList:
     call printList
     add esp, 4
     mov ebx, 0
+    mov ecx, 0
     mov bl, [eax]
-    pusha
-    push ebx
-    push hex_format
-    call printf
-    add esp, 8
-    popa
-    
+    mov cl, bl
+    and cl, 00001111b
+    shr bl, 4
+    printfMacro ebx, hex_format
+    printfMacro ecx, hex_format
     .end:
     popad
     pop ebp
@@ -351,12 +393,12 @@ printListReverse:
         je .endPrintLoop
         mov ebx, 0
         mov bl, [eax]
-        pusha
+        pushad
         push ebx
         push hex_format
         call printf
         add esp, 8
-        popa
+        popad
         mov eax, [eax + 1]
         jmp .printLoop
     .endPrintLoop:
