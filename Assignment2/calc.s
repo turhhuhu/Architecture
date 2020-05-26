@@ -56,8 +56,9 @@ section .rodata
 ;; this macro changes edx!!!
 ;; DO NOT USE EDX AS PUSH ARGUMENT
 %macro pushOp 1
-    pushad
+    push edx
     push eax
+    mov ebx, 1
     isFullOpStack
     cmp eax, 0
     jne %%pusherr
@@ -68,10 +69,11 @@ section .rodata
     mov [opsp], edx
     jmp %%pushend
     %%pusherr:
+        mov ebx, 0
         printErr "Error: Operand Stack Overflow"
         pop eax
     %%pushend:
-    popad
+    pop edx
 %endmacro
 
 ;; this macro changes edx!!!
@@ -94,6 +96,8 @@ section .rodata
 %endmacro
 
 %macro peekOp 1
+    push eax
+    push edx
     isEmptyOpStack
     cmp eax, 0
     mov ebx, 1
@@ -106,6 +110,8 @@ section .rodata
         mov ebx, 0
         printErr "Error: Insufficient Number of Arguments on Stack"
     %%peekend:
+    pop edx
+    pop eax
 %endmacro
 
 %macro allocate 1
@@ -198,8 +204,6 @@ main:
     ;; eax now has decimal stack size
     .initStack:
     mov [size], eax
-    
-   
 
     .calc_loop:
     mov dword [inputBuffer], 0
@@ -220,6 +224,16 @@ main:
     call duplicate
     jmp .calc_loop
     .notDup:
+    cmp byte [inputBuffer], '|'
+    jne .notOr
+    call orOperator
+    jmp .calc_loop
+    .notOr:
+    cmp byte [inputBuffer], '&'
+    jne .notAnd
+    call andOperator
+    jmp .calc_loop
+    .notAnd:
     .loop_cont:
     createListAndPush inputBuffer
     jmp .calc_loop
@@ -252,22 +266,207 @@ popAndPrint:
     popad
     pop ebp
     ret
+
+
+orOperator:
+    push ebp
+    mov ebp, esp
+    pushad
+    sub esp, 16
+    popOp eax
+    cmp ebx, 0
+    je .end
+    mov [ebp - 4], eax
+    popOp ecx
+    cmp ebx, 0
+    je .end
+    mov [ebp - 8], ecx
+
+    mov eax, [ebp - 4] 
+    mov ecx, [ebp - 8] 
+    push eax
+    call listLength
+    add esp, 4
+    mov ebx, eax ; ebx now hold length of first list
+    push ecx
+    call listLength
+    add esp, 4
+    cmp ebx, eax
+    jae .firstListBigger
+    mov edx, [ebp - 4]
+    mov ecx, [ebp - 8]
+    mov [ebp - 4], ecx
+    mov [ebp - 8], edx
+    mov edx, [edx]
+    mov ecx, [ecx]
+    mov [ebp - 16], edx
+    mov [ebp - 12], ecx
+    mov ecx, ebx
+    mov ebx, eax
+    mov eax, ecx
+    jmp .end_length_compare
+    .firstListBigger:
+    mov edx, [ebp - 4]
+    mov edx, [edx]
+    mov ecx, [ebp - 8]
+    mov ecx, [ecx]
+    mov [ebp - 12], edx
+    mov [ebp - 16], ecx
+
+
+    .end_length_compare:
+    mov ecx, ebx
+    sub ecx, eax
+    .or_loop:
+    cmp ecx, 0
+    je .end_or_loop
+    mov eax, [ebp - 12]
+    mov ebx, [ebp - 16]
+    mov dl, [ebx]
+    or dl, byte [eax]
+    mov byte [eax], dl
+    mov eax, [eax + 1]
+    mov ebx, [ebx + 1]
+    mov [ebp - 12], eax
+    mov [ebp - 16], ebx
+    sub ecx, 1
+    jmp .or_loop
+    .end_or_loop:
+
+    mov eax, [ebp - 4]
+    pushOp eax
     
+    mov eax, [ebp - 8]
+    push eax
+    call freeList
+    add esp, 4
+
+    .end:
+    add esp, 16
+    popad
+    pop ebp
+    ret
+
+
+andOperator:
+    push ebp
+    mov ebp, esp
+    pushad
+    sub esp, 16
+    popOp eax
+    cmp ebx, 0
+    je .end
+    mov [ebp - 4], eax
+    popOp ecx
+    cmp ebx, 0
+    je .end
+    mov [ebp - 8], ecx
+
+    mov eax, [ebp - 4] 
+    mov ecx, [ebp - 8] 
+    push eax
+    call listLength
+    add esp, 4
+    mov ebx, eax ; ebx now hold length of first list
+    push ecx
+    call listLength
+    add esp, 4
+    cmp ebx, eax
+    jae .firstListBigger
+    mov edx, [ebp - 4]
+    mov ecx, [ebp - 8]
+    mov [ebp - 4], ecx
+    mov [ebp - 8], edx
+    mov edx, [edx]
+    mov ecx, [ecx]
+    mov [ebp - 16], edx
+    mov [ebp - 12], ecx
+    mov ecx, ebx
+    mov ebx, eax
+    mov eax, ecx
+    jmp .end_length_compare
+    .firstListBigger:
+    mov edx, [ebp - 4]
+    mov edx, [edx]
+    mov ecx, [ebp - 8]
+    mov ecx, [ecx]
+    mov [ebp - 12], edx
+    mov [ebp - 16], ecx
+
+
+    .end_length_compare:
+    mov ecx, ebx
+    sub ecx, eax
+    .or_loop:
+    cmp ecx, 0
+    je .end_or_loop
+    mov eax, [ebp - 16]
+    mov ebx, [ebp - 12]
+    mov dl, [ebx]
+    and dl, byte [eax]
+    mov byte [eax], dl
+    mov eax, [eax + 1]
+    mov ebx, [ebx + 1]
+    mov [ebp - 16], eax
+    mov [ebp - 12], ebx
+    sub ecx, 1
+    jmp .or_loop
+    .end_or_loop:
+
+    mov eax, [ebp - 8]
+    pushOp eax
+
+    mov eax, [ebp - 4]
+    push eax
+    call freeList
+    add esp, 4
+
+    .end:
+    add esp, 16
+    popad
+    pop ebp
+    ret
+
+
+listLength:
+    push ebp
+    mov ebp, esp
+    push ebx
+
+    mov eax, 0
+    mov ebx, [ebp + 8]
+    mov ebx, [ebx]
+    .for_loop:
+    cmp ebx, 0
+    je .end
+    inc eax
+    mov ebx, [ebx + 1]
+    jmp .for_loop
+    .end:
+
+    pop ebx
+    pop ebp
+    ret
+
 duplicate:
     push ebp
     mov ebp, esp
     pushad
+    sub esp, 4
 
     peekOp ecx ; headp of the list to dup 
     cmp ebx, 0
     je .end
 
     allocate 4
-    mov ebx, eax ; headP of the dup list
-    pushOp ebx ;need to check for overflow!! 
+    mov [ebp - 4], eax
+    pushOp eax ;need to check for overflow!!
+    cmp ebx, 0
+    je .end
     mov ecx, [ecx] 
     cmp ecx, 0
     je .end
+    mov ebx, [ebp - 4]
     allocate NODE_SIZE
     mov dword [ebx], eax
     mov dl, byte [ecx]
@@ -287,6 +486,7 @@ duplicate:
     mov ecx, [ecx + 1]
     jmp .for_loop 
     .end:
+    add esp, 4
     popad
     pop ebp
     ret
