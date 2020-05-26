@@ -27,6 +27,7 @@ section .rodata
     format: db "%d" , 10, 0
     hex_format: db "%X", 0
     str_format: db "%s", 0
+    char_format: dd "%c", 0
 
 %macro isFullOpStack 0
     push ebx
@@ -75,9 +76,11 @@ section .rodata
 
 ;; this macro changes edx!!!
 ;; DO NOT USE EDX AS POP ARGUMENT
+;; this macro returns 1 in ebx if pop was successfull and 0 otherwise.
 %macro popOp 1
     isEmptyOpStack
     cmp eax, 0
+    mov ebx, 1
     jne %%poperr
     mov edx, [opsp]
     sub edx, 4
@@ -85,31 +88,48 @@ section .rodata
     mov %1, [edx]
     jmp %%popend
     %%poperr:
+        mov ebx, 0
         printErr "Error: Insufficient Number of Arguments on Stack"
     %%popend:
 %endmacro
 
-%macro createList 0
-    jmp %%skip
-section .data
-    %%headP: dd 0
-section .text
-    %%skip:
-    mov eax, %%headP
+%macro peekOp 1
+    isEmptyOpStack
+    cmp eax, 0
+    mov ebx, 1
+    jne %%peekerr
+    mov edx, [opsp]
+    sub edx, 4
+    mov %1, [edx]
+    jmp %%peekend
+    %%peekerr:
+        mov ebx, 0
+        printErr "Error: Insufficient Number of Arguments on Stack"
+    %%peekend:
 %endmacro
 
+%macro allocate 1
+    push ecx
+    push ebx
+    push edx
+    push %1
+    call malloc
+    add esp, 4
+    mov dword [eax], 0
+    pop edx
+    pop ebx
+    pop ecx
+%endmacro
 
+    
 %macro createListAndPush 1
     pushad
-    createList
-    mov ebx, eax
-    pushad
+    allocate 4
+    pushOp eax
     push eax
     push %1
     call createListFromHexString
     add esp, 8
-    popad
-    pushOp ebx
     popad
 %endmacro
 
@@ -124,8 +144,22 @@ section .text
 %macro printErr 1
 jmp %%skip_print
 section .data
-    %%str_to_print: db %1, 0
+    %%str_to_print: db %1, 10, 0
 section .text
+    %%skip_print:
+    pushad
+    push %%str_to_print
+    push str_format
+    call printf
+    add esp, 8
+    popad
+%endmacro
+
+%macro printStr 1
+    jmp %%skip_print
+    section .data
+    %%str_to_print: db %1, 10, 0
+    section .text
     %%skip_print:
     pushad
     push %%str_to_print
@@ -164,86 +198,99 @@ main:
     ;; eax now has decimal stack size
     .initStack:
     mov [size], eax
-    ; mov eax, 5
-    ; pushOp eax
-    ; mov eax, 2
-    ; pushOp eax
-    ; popOp eax
-    ; printfMacro eax, format
-    ; popOp eax
-    ; printfMacro eax, format
+    
+   
 
-    ; createListAndPush strp1
-    ; createListAndPush strp1
-    ; popOp eax
-    ; printfMacro eax, format
-    ; mov eax, [eax]
-    ; push eax
-    ; call printList
-    ; add esp, 4
-    ; popOp eax
-    ; printfMacro eax, format
-
-    ; mov eax, [eax]
-    ; push eax
-    ; call printList
-    ; add esp, 4
-
-
-    mov ecx, 3
-    top:
-    cmp ecx, 0
-    je end_test
-    createListAndPush strp1
-    sub ecx, 1
-    jmp top
-    end_test:
-    popOp eax
-    mov eax, [eax]
-    push eax
-    call printList
-    add esp,4
-    popOp eax
-    mov eax, [eax]
-    push eax
-    call printList
-    add esp,4
-    popOp eax
-    mov eax, [eax]
-    push eax
-    call printList
-    add esp,4
-    ; calc_loop:
-    ; mov dword [inputBuffer], 0
-    ; push dword [stdin]
-    ; push MAX_USER_INPUT
-    ; push inputBuffer
-    ; call fgets
-    ; add esp, 12
-    ; createListAndPush strp1
-    ; cmp byte [inputBuffer], 'q'
-    ; je end_calc_loop
-    ; cmp byte [inputBuffer], 'p'
-    ; jne loop_cont
-    ; popOp eax
-    ; printfMacro eax, format
-    ; mov eax, [eax]
-    ; push eax
-    ; call printList
-    ; add esp, 4
-    ; jmp calc_loop
-    ; loop_cont:
-    ; jmp calc_loop
-    ; end_calc_loop:
+    .calc_loop:
+    mov dword [inputBuffer], 0
+    push dword [stdin]
+    push MAX_USER_INPUT
+    push inputBuffer
+    call fgets
+    add esp, 12
+    cmp byte [inputBuffer], 'q'
+    je .end_calc_loop
+    cmp byte [inputBuffer], 'p'
+    jne .notPrint
+    call popAndPrint
+    jmp .calc_loop
+    .notPrint:
+    cmp byte [inputBuffer], 'd'
+    jne .notDup
+    call duplicate
+    jmp .calc_loop
+    .notDup:
+    .loop_cont:
+    createListAndPush inputBuffer
+    jmp .calc_loop
+    .end_calc_loop:
 
 
     popad
     pop ebp
     ret
 
-duplicate:
-    
+popAndPrint:
+    push ebp
+    mov ebp, esp
+    pushad
 
+    popOp eax
+    cmp ebx, 0
+    je .end
+    mov ecx, eax
+    mov eax, [eax]
+    push eax
+    call printList
+    add esp, 4
+    push ecx
+    call freeList
+    add esp, 4
+    printStr ""
+    .end:
+    
+    popad
+    pop ebp
+    ret
+    
+duplicate:
+    push ebp
+    mov ebp, esp
+    pushad
+
+    peekOp ecx ; headp of the list to dup 
+    cmp ebx, 0
+    je .end
+
+    allocate 4
+    mov ebx, eax ; headP of the dup list
+    pushOp ebx ;need to check for overflow!! 
+    mov ecx, [ecx] 
+    cmp ecx, 0
+    je .end
+    allocate NODE_SIZE
+    mov dword [ebx], eax
+    mov dl, byte [ecx]
+    mov byte [eax], dl
+    mov dword [eax + 1], 0
+    mov ebx, eax
+    mov ecx, dword [ecx + 1]
+    .for_loop:
+    cmp ecx, 0
+    je .end
+    allocate NODE_SIZE
+    mov dword [ebx + 1], eax
+    mov dl, byte [ecx]
+    mov byte [eax], dl
+    mov dword [eax + 1], 0
+    mov dword ebx, [ebx + 1]
+    mov ecx, [ecx + 1]
+    jmp .for_loop 
+    .end:
+    popad
+    pop ebp
+    ret
+    
 strToDecimal:
     push ebp
     mov ebp, esp
@@ -274,8 +321,8 @@ createListFromHexString:
     
     mov eax, [ebp + 8]
     mov edx, [ebp + 12]
-
     mov ebx, 0
+
     .checkEven:
     cmp byte [eax], 0
     jz .endCheckEven
@@ -337,9 +384,7 @@ addToList:
     mov ebp, esp
     pushad
 
-    push NODE_SIZE
-    call malloc
-    add esp, 4
+    allocate NODE_SIZE
     mov ebx, [ebp + 12]
     mov byte [eax], bl
     mov dword ebx, [ebp + 8]
@@ -359,6 +404,7 @@ addToList:
     popad
     pop ebp
     ret
+
 
 freeList:
     push ebp
@@ -380,14 +426,14 @@ freeList:
         jmp .freeLoop
     .endFreeLoop:
 
-    ; push eax
-    ; call free
-    ; add esp, 4
+    push eax
+    call free
+    add esp, 4
 
-    ; mov eax, [ebp + 8]
-    ; push eax
-    ; call free
-    ; add esp, 4
+    mov eax, [ebp + 8]
+    push eax
+    call free
+    add esp, 4
 
     
     popad
