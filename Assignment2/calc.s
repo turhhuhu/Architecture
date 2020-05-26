@@ -139,6 +139,17 @@ section .rodata
     popad
 %endmacro
 
+%macro createListFromNumberAndPush 1
+    pushad
+    allocate 4
+    pushOp eax
+    push eax
+    push %1
+    call createListFromNumber
+    add esp, 8
+    popad
+%endmacro
+
 %macro hexCharConvertor 1
     cmp %1, 65
     jl %%cont
@@ -234,12 +245,242 @@ main:
     call andOperator
     jmp .calc_loop
     .notAnd:
+    cmp byte [inputBuffer], '+'
+    jne .notPlus
+    call plusOperator
+    jmp .calc_loop
+    .notPlus:
+    cmp byte [inputBuffer], 'n'
+    jne .notNumOfDig
+    call numberOfDigits
+    jmp .calc_loop
+    .notNumOfDig:
+    cmp byte [inputBuffer], 'l'
+    jne .notLength
+    popOp eax
+    push eax
+    call listLength
+    printfMacro eax, hex_format
+    add esp, 4
+    jmp .calc_loop
+    .notLength:
     .loop_cont:
     createListAndPush inputBuffer
     jmp .calc_loop
     .end_calc_loop:
 
 
+    popad
+    pop ebp
+    ret
+
+;;ebx length
+;;edx num of zeros
+listLength:
+    push ebp
+    mov ebp, esp
+    push ebx
+    push ecx
+    push edx
+
+    mov ebx, 0
+    mov edx, 0
+    mov eax, [ebp + 8]
+    mov eax, [eax]
+    
+    .for_loop:
+    cmp eax, 0
+    je .end_loop
+    cmp byte [eax], 0
+    jne .no_zero
+    inc edx
+    jmp .cont
+    .no_zero:
+    inc ebx
+    add ebx, edx
+    mov edx, 0
+    .cont:
+    mov eax, dword [eax + 1]
+    jmp .for_loop
+    .end_loop:
+
+    cmp ebx, 0
+    jne .end
+    cmp edx, 0
+    je .end
+    add ebx, 1 
+    .end:
+    mov eax, ebx
+
+    pop edx
+    pop ecx
+    pop ebx
+    pop ebp
+    ret
+    
+
+numberOfDigits:
+    push ebp
+    mov ebp, esp
+    pushad
+
+    popOp eax
+    mov ecx, eax
+    mov ebx, [eax]
+    push eax
+    call listLength
+    add esp, 4
+    imul eax, 2
+    .advance_loop:
+    cmp dword [ebx + 1], 0
+    je .end_advance_loop
+    mov ebx, [ebx + 1]
+    .end_advance_loop:
+    mov edx, 0
+    mov dl, byte [ebx]
+    cmp byte [ebx], 16
+    jae .2Digits
+    sub eax, 1
+    jmp .end
+    .2Digits:
+
+    .end:
+    mov edx, eax
+    createListFromNumberAndPush edx
+
+    push ecx
+    call freeList
+    add esp, 4
+
+    popad
+    pop ebp
+    ret
+
+
+createListFromNumber:
+    push ebp
+    mov ebp, esp
+    pushad
+
+    mov ebx, [ebp + 8]
+    mov ecx, [ebp + 12]
+    mov edx, 0
+    mov dl, bl
+
+    .for_loop:
+    cmp ebx, 0
+    je .end_loop
+    mov edx, 0
+    mov dl, bl
+    push edx
+    push ecx
+    call addToList
+    add esp, 8
+    shr ebx, 8
+    .end_loop:
+    
+    popad
+    pop ebp
+    ret
+    
+plusOperator:
+    push ebp
+    mov ebp, esp
+    pushad
+    sub esp, 16
+
+    popOp eax
+    cmp ebx, 0
+    je .end
+    mov [ebp - 4], eax
+    popOp ecx
+    cmp ebx, 0
+    je .end
+    mov [ebp - 8], ecx
+
+    mov eax, [ebp - 4] 
+    mov ecx, [ebp - 8] 
+    push eax
+    call listLength
+    add esp, 4
+    mov ebx, eax ; ebx now hold length of first list
+    push ecx
+    call listLength
+    add esp, 4
+    cmp ebx, eax
+    jae .firstListBigger
+    mov edx, [ebp - 4]
+    mov ecx, [ebp - 8]
+    mov [ebp - 4], ecx
+    mov [ebp - 8], edx
+    mov edx, [edx]
+    mov ecx, [ecx]
+    mov [ebp - 16], edx
+    mov [ebp - 12], ecx
+    mov ecx, ebx
+    mov ebx, eax
+    mov eax, ecx
+    jmp .end_length_compare
+    .firstListBigger:
+    mov edx, [ebp - 4]
+    mov edx, [edx]
+    mov ecx, [ebp - 8]
+    mov ecx, [ecx]
+    mov [ebp - 12], edx
+    mov [ebp - 16], ecx
+
+    .end_length_compare:
+    mov ecx, eax
+    clc
+    .add_loop:
+    cmp ecx, 0
+    je .end_add_loop
+    mov eax, [ebp - 12]
+    mov ebx, [ebp - 16]
+    mov dl, [ebx]
+    adc dl, byte [eax]
+    setc dh
+    mov byte [eax], dl
+    cmp ecx, 1
+    je .end_add_loop
+    mov eax, [eax + 1]
+    mov ebx, [ebx + 1]
+    mov [ebp - 12], eax
+    mov [ebp - 16], ebx
+    sub ecx, 1
+    jmp .add_loop
+    .end_add_loop:
+
+    cmp dword [eax + 1], 0
+    jne .noNewNode
+    cmp dh, 0
+    je .noCarry
+    jmp .newNode
+    .noNewNode:
+    mov eax, dword [eax + 1]
+    add byte [eax], 1
+    mov dword [ebp - 12], eax
+    jnc .noCarry
+    .newNode:
+    allocate NODE_SIZE
+    mov byte [eax], 1
+    mov dword [eax + 1], 0
+    mov ebx, [ebp - 12]
+    mov dword [ebx + 1], eax
+    jmp .noCarry
+    .noCarry:
+
+    
+    mov eax, [ebp - 4]
+    pushOp eax
+
+    mov eax, [ebp - 8]
+    push eax
+    call freeList
+    add esp, 4
+
+    .end:
+    add esp, 16
     popad
     pop ebp
     ret
@@ -253,9 +494,8 @@ popAndPrint:
     cmp ebx, 0
     je .end
     mov ecx, eax
-    mov eax, [eax]
     push eax
-    call printList
+    call printListWithoutLeadingZeros
     add esp, 4
     push ecx
     call freeList
@@ -266,7 +506,6 @@ popAndPrint:
     popad
     pop ebp
     ret
-
 
 orOperator:
     push ebp
@@ -315,8 +554,7 @@ orOperator:
 
 
     .end_length_compare:
-    mov ecx, ebx
-    sub ecx, eax
+    mov ecx, eax
     .or_loop:
     cmp ecx, 0
     je .end_or_loop
@@ -335,12 +573,8 @@ orOperator:
 
     mov eax, [ebp - 4]
     pushOp eax
-    
-    mov eax, [ebp - 8]
-    push eax
-    call freeList
-    add esp, 4
 
+    
     .end:
     add esp, 16
     popad
@@ -385,6 +619,7 @@ andOperator:
     mov ebx, eax
     mov eax, ecx
     jmp .end_length_compare
+
     .firstListBigger:
     mov edx, [ebp - 4]
     mov edx, [edx]
@@ -393,10 +628,8 @@ andOperator:
     mov [ebp - 12], edx
     mov [ebp - 16], ecx
 
-
     .end_length_compare:
-    mov ecx, ebx
-    sub ecx, eax
+    mov ecx, eax
     .or_loop:
     cmp ecx, 0
     je .end_or_loop
@@ -427,26 +660,6 @@ andOperator:
     pop ebp
     ret
 
-
-listLength:
-    push ebp
-    mov ebp, esp
-    push ebx
-
-    mov eax, 0
-    mov ebx, [ebp + 8]
-    mov ebx, [ebx]
-    .for_loop:
-    cmp ebx, 0
-    je .end
-    inc eax
-    mov ebx, [ebx + 1]
-    jmp .for_loop
-    .end:
-
-    pop ebx
-    pop ebp
-    ret
 
 duplicate:
     push ebp
@@ -549,10 +762,8 @@ createListFromHexString:
     popad
     add eax, 1
     jmp .endCmp
-    
     .endCmp:
-
-
+    
     .for_loop:
         cmp byte [eax], 0
         jz .end
@@ -644,32 +855,16 @@ printListWithoutLeadingZeros:
     mov ebp, esp
     pushad
 
-    mov eax, [ebp + 8]
-    mov ebx, 0
-    mov ecx, 0
-    mov bl, [eax]
-    mov cl, bl
-    and cl, 00001111b
-    shr bl ,4
-    cmp ebx, 0
-    jne .printHalfByte
-    pushad
+    mov ebx, [ebp + 8]
+    push ebx
+    call listLength
+    add esp, 4
+
+    mov ebx, [ebx]
+    push ebx
     push eax
     call printList
-    add esp, 4
-    popad
-    jmp .end
-
-    .printHalfByte:
-    mov eax, [eax + 1]
-    pushad
-    push eax
-    call printList
-    add esp, 4
-    popad
-    printfMacro ecx, hex_format
-    .end:
-
+    add esp, 8
     popad
     pop ebp
     ret
@@ -679,19 +874,32 @@ printList:
     mov ebp, esp
     pushad
 
-    mov eax, [ebp + 8]
+    mov eax, [ebp + 12]
+    mov edx, [ebp + 8]
+    cmp edx, 0
+    je .end
     cmp eax, 0
     je .end
+    dec edx
     mov ebx, [eax + 1]
     push ebx
+    push edx
     call printList
-    add esp, 4
+    add esp, 8
     mov ebx, 0
     mov ecx, 0
     mov bl, [eax]
     mov cl, bl
     and cl, 00001111b
     shr bl, 4
+    mov edx, [ebp + 8]   
+    cmp edx, 1
+    jne .printBoth
+    cmp ebx, 0
+    jne .printBoth
+    printfMacro ecx, hex_format
+    jmp .end
+    .printBoth:
     printfMacro ebx, hex_format
     printfMacro ecx, hex_format
     .end:
