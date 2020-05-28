@@ -10,13 +10,13 @@ section .text
   extern fgets
   extern stdin
   extern stderr
-  
+  extern stdout
+
 %define NODE_SIZE 5
 %define MAX_USER_INPUT 80
 section .data
     p: dd 0
     opsp: dd opStack
-    numOfOp: dd 0
     debug: db 0
 
 section .bss
@@ -94,29 +94,37 @@ section .rodata
 ; DO NOT USE EDX AS POP ARGUMENT
 ; this macro returns 1 in ebx if pop was successfull and 0 otherwise.
 %macro popOp 1
+    push eax
     isEmptyOpStack
     cmp eax, 0
-    jne %%popend
+    jne %%poperr
+    pop eax
     mov edx, [opsp]
     sub edx, 4
     mov [opsp], edx
     mov %1, [edx]
+    jmp %%popend
+    %%poperr:
+    pop eax
     %%popend:
 %endmacro
 
 
 %macro peekOp 1
-    push eax
     push edx
+    push eax
     isEmptyOpStack
     cmp eax, 0
-    jne %%peekend
+    jne %%peekerr
+    pop eax
     mov edx, [opsp]
     sub edx, 4
     mov %1, [edx]
+    jmp %%peekend
+    %%peekerr:
+    pop eax
     %%peekend:
     pop edx
-    pop eax
 %endmacro
 
 %macro allocate 1
@@ -178,28 +186,35 @@ section .text
 %endmacro
 
 
-%macro printErr 1
+%macro debugM 0
 jmp %%skip_print
 section .data
-    %%str_to_print: db %1, 10, 0
+    %%str_to_print: db "debug: ", 0
 section .text
     %%skip_print:
-    cmp byte [debug], 
     pushad
+    cmp byte [debug], 0
+    je %%noDebgug
     push %%str_to_print
     push str_format
     push dword [stderr]
     call fprintf
     add esp, 12
+    peekOp eax
+    push eax
+    push dword [stderr]
+    call printListWithoutLeadingZeros
+    add esp, 8
+    printInfo ""
+    %%noDebgug:
     popad
 %endmacro
 
-
 %macro fprintfM 3
     pushad
-    push %1
-    push %2
     push %3
+    push %2
+    push %1
     call fprintf
     add esp, 12
     popad
@@ -226,17 +241,21 @@ main:
     .initStack:
     mov [size], eax
 
+    mov eax, [ebp + 8]
+    cmp eax, 3
+    jb .notdebug
     mov eax, [ebp + 12]
     mov eax, [eax + 8]
     cmp byte [eax], '-'
-    jne notdebug
+    jne .notdebug
     cmp byte [eax + 1], 'd'
-    jne notdebug
+    jne .notdebug
     mov byte [debug], 1
-    notdebug:
+    .notdebug:
 
     call myCalc
-    
+
+
     popad
     pop ebp
     ret
@@ -245,11 +264,13 @@ myCalc:
     push ebp
     mov ebp, esp
     pushad
+    sub esp, 4
 
-    mov dword [numOfOp], 0
+    mov dword [ebp - 4], 0
     .calc_loop:
-    printfMacro calc_string, str_format
-    inc dword [numOfOp]
+    mov eax, [stdout]
+    fprintfM eax, str_format, calc_string
+    inc dword [ebp - 4]
     mov dword [inputBuffer], 0
     push dword [stdin]
     push MAX_USER_INPUT
@@ -272,6 +293,7 @@ myCalc:
     cmp eax, 1 
     je .error_insufficent
     call duplicate
+    debugM
     jmp .calc_loop
     .notDup:
     cmp byte [inputBuffer], '|'
@@ -280,6 +302,7 @@ myCalc:
     cmp eax, 0 
     je .error_insufficent
     call orOperator
+    debugM
     jmp .calc_loop
     .notOr:
     cmp byte [inputBuffer], '&'
@@ -288,6 +311,7 @@ myCalc:
     cmp eax, 0 
     je .error_insufficent
     call andOperator
+    debugM
     jmp .calc_loop
     .notAnd:
     cmp byte [inputBuffer], '+'
@@ -296,6 +320,7 @@ myCalc:
     cmp eax, 0 
     je .error_insufficent
     call plusOperator
+    debugM
     jmp .calc_loop
     .notPlus:
     cmp byte [inputBuffer], 'n'
@@ -304,6 +329,7 @@ myCalc:
     cmp eax, 1 
     je .error_insufficent
     call numberOfDigits
+    debugM
     jmp .calc_loop
     .notNumOfDig:
     .loop_cont:
@@ -311,8 +337,11 @@ myCalc:
     cmp eax, 1
     je .error_full
     createListAndPush inputBuffer
+    debugM
+    dec dword [ebp - 4]
     jmp .calc_loop
 
+   
     .error_insufficent:
     printInfo "Error: Insufficient Number of Arguments on Stack"
     jmp .calc_loop
@@ -322,11 +351,13 @@ myCalc:
     
     .end_calc_loop:
 
-    dec dword [numOfOp]
-    printfMacro dword [numOfOp], hex_format_withNl
+    dec dword [ebp - 4]
+    mov eax, [stdout]
+    fprintfM eax, hex_format_withNl, dword [ebp - 4]
     
     call freeStack
     
+    add esp, 4
     popad
     pop ebp
     ret
@@ -565,8 +596,9 @@ popAndPrint:
     popOp eax
     mov ecx, eax
     push eax
+    push dword [stdout]
     call printListWithoutLeadingZeros
-    add esp, 4
+    add esp, 8
     push ecx
     call freeList
     add esp, 4
@@ -920,7 +952,7 @@ printListWithoutLeadingZeros:
     mov ebp, esp
     pushad
 
-    mov ebx, [ebp + 8]
+    mov ebx, [ebp + 12]
     push ebx
     call listLength
     add esp, 4
@@ -928,8 +960,9 @@ printListWithoutLeadingZeros:
     mov ebx, [ebx]
     push ebx
     push eax
+    push dword [ebp + 8]
     call printList
-    add esp, 8
+    add esp, 12
     popad
     pop ebp
     ret
@@ -939,8 +972,9 @@ printList:
     mov ebp, esp
     pushad
 
-    mov eax, [ebp + 12]
-    mov edx, [ebp + 8]
+    mov eax, [ebp + 16]
+    mov edx, [ebp + 12]
+    mov ebx, [stdout]
     cmp edx, 0
     je .end
     cmp eax, 0
@@ -949,51 +983,28 @@ printList:
     mov ebx, [eax + 1]
     push ebx
     push edx
+    push dword [ebp + 8]
     call printList
-    add esp, 8
+    add esp, 12
     mov ebx, 0
     mov ecx, 0
     mov bl, [eax]
     mov cl, bl
     and cl, 00001111b
     shr bl, 4
-    mov edx, [ebp + 8]   
+    mov edx, [ebp + 12]   
     cmp edx, 1
     jne .printBoth
     cmp ebx, 0
     jne .printBoth
-    printfMacro ecx, hex_format
+    mov eax, [ebp + 8]
+    fprintfM eax, hex_format, ecx 
     jmp .end
     .printBoth:
-    printfMacro ebx, hex_format
-    printfMacro ecx, hex_format
-    .end:
-    popad
-    pop ebp
-    ret
-
-
-printListReverse:
-    push ebp
-    mov ebp, esp
-    pushad
-
     mov eax, [ebp + 8]
-    mov eax, [eax]
-    .printLoop:
-        cmp eax, 0
-        je .endPrintLoop
-        mov ebx, 0
-        mov bl, [eax]
-        pushad
-        push ebx
-        push hex_format
-        call printf
-        add esp, 8
-        popad
-        mov eax, [eax + 1]
-        jmp .printLoop
-    .endPrintLoop:
+    fprintfM eax, hex_format, ebx 
+    fprintfM eax, hex_format, ecx
+    .end:
     popad
     pop ebp
     ret
