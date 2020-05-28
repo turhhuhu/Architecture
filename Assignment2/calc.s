@@ -9,14 +9,15 @@ section .text
   extern getchar 
   extern fgets
   extern stdin
+  extern stderr
   
 %define NODE_SIZE 5
 %define MAX_USER_INPUT 80
 section .data
-    strp: db "ABCD", 0
-    strp1: db "8DF2", 0
     p: dd 0
     opsp: dd opStack
+    numOfOp: dd 0
+    debug: db 0
 
 section .bss
     opStack: resd 256
@@ -28,6 +29,8 @@ section .rodata
     hex_format: db "%X", 0
     str_format: db "%s", 0
     char_format: dd "%c", 0
+    hex_format_withNl: db "%X", 10, 0
+    calc_string: db "calc: ", 0
 
 %macro isFullOpStack 0
     push ebx
@@ -53,8 +56,21 @@ section .rodata
     pop ebx
 %endmacro
 
-;; this macro changes edx!!!
-;; DO NOT USE EDX AS PUSH ARGUMENT
+%macro hasAtleast2Ops 0
+    push ebx
+    mov ebx, 8
+    add ebx, opStack
+    mov eax, 0
+    cmp ebx, [opsp]
+    ja %%no2ops
+    mov eax, 1
+    %%no2ops:
+    pop ebx
+%endmacro
+
+
+; this macro changes edx!!!
+; DO NOT USE EDX AS PUSH ARGUMENT
 %macro pushOp 1
     push edx
     push eax
@@ -69,46 +85,35 @@ section .rodata
     mov [opsp], edx
     jmp %%pushend
     %%pusherr:
-        mov ebx, 0
-        printErr "Error: Operand Stack Overflow"
         pop eax
     %%pushend:
     pop edx
 %endmacro
 
-;; this macro changes edx!!!
-;; DO NOT USE EDX AS POP ARGUMENT
-;; this macro returns 1 in ebx if pop was successfull and 0 otherwise.
+; this macro changes edx!!!
+; DO NOT USE EDX AS POP ARGUMENT
+; this macro returns 1 in ebx if pop was successfull and 0 otherwise.
 %macro popOp 1
     isEmptyOpStack
     cmp eax, 0
-    mov ebx, 1
-    jne %%poperr
+    jne %%popend
     mov edx, [opsp]
     sub edx, 4
     mov [opsp], edx
     mov %1, [edx]
-    jmp %%popend
-    %%poperr:
-        mov ebx, 0
-        printErr "Error: Insufficient Number of Arguments on Stack"
     %%popend:
 %endmacro
+
 
 %macro peekOp 1
     push eax
     push edx
     isEmptyOpStack
     cmp eax, 0
-    mov ebx, 1
-    jne %%peekerr
+    jne %%peekend
     mov edx, [opsp]
     sub edx, 4
     mov %1, [edx]
-    jmp %%peekend
-    %%peekerr:
-        mov ebx, 0
-        printErr "Error: Insufficient Number of Arguments on Stack"
     %%peekend:
     pop edx
     pop eax
@@ -152,13 +157,13 @@ section .rodata
 
 %macro hexCharConvertor 1
     cmp %1, 65
-    jl %%cont
+    jb %%cont
     sub %1, 7
     %%cont:
     sub %1, '0'
 %endmacro
 
-%macro printErr 1
+%macro printInfo 1
 jmp %%skip_print
 section .data
     %%str_to_print: db %1, 10, 0
@@ -172,26 +177,31 @@ section .text
     popad
 %endmacro
 
-%macro printStr 1
-    jmp %%skip_print
-    section .data
+
+%macro printErr 1
+jmp %%skip_print
+section .data
     %%str_to_print: db %1, 10, 0
-    section .text
+section .text
     %%skip_print:
+    cmp byte [debug], 
     pushad
     push %%str_to_print
     push str_format
-    call printf
-    add esp, 8
+    push dword [stderr]
+    call fprintf
+    add esp, 12
     popad
 %endmacro
 
-%macro printfMacro 2
+
+%macro fprintfM 3
     pushad
     push %1
     push %2
-    call printf
-    add esp, 8
+    push %3
+    call fprintf
+    add esp, 12
     popad
 %endmacro
 
@@ -216,7 +226,30 @@ main:
     .initStack:
     mov [size], eax
 
+    mov eax, [ebp + 12]
+    mov eax, [eax + 8]
+    cmp byte [eax], '-'
+    jne notdebug
+    cmp byte [eax + 1], 'd'
+    jne notdebug
+    mov byte [debug], 1
+    notdebug:
+
+    call myCalc
+    
+    popad
+    pop ebp
+    ret
+
+myCalc:
+    push ebp
+    mov ebp, esp
+    pushad
+
+    mov dword [numOfOp], 0
     .calc_loop:
+    printfMacro calc_string, str_format
+    inc dword [numOfOp]
     mov dword [inputBuffer], 0
     push dword [stdin]
     push MAX_USER_INPUT
@@ -227,53 +260,76 @@ main:
     je .end_calc_loop
     cmp byte [inputBuffer], 'p'
     jne .notPrint
+    isEmptyOpStack
+    cmp eax, 1 
+    je .error_insufficent
     call popAndPrint
     jmp .calc_loop
     .notPrint:
     cmp byte [inputBuffer], 'd'
     jne .notDup
+    isEmptyOpStack
+    cmp eax, 1 
+    je .error_insufficent
     call duplicate
     jmp .calc_loop
     .notDup:
     cmp byte [inputBuffer], '|'
     jne .notOr
+    hasAtleast2Ops
+    cmp eax, 0 
+    je .error_insufficent
     call orOperator
     jmp .calc_loop
     .notOr:
     cmp byte [inputBuffer], '&'
     jne .notAnd
+    hasAtleast2Ops
+    cmp eax, 0 
+    je .error_insufficent
     call andOperator
     jmp .calc_loop
     .notAnd:
     cmp byte [inputBuffer], '+'
     jne .notPlus
+    hasAtleast2Ops
+    cmp eax, 0 
+    je .error_insufficent
     call plusOperator
     jmp .calc_loop
     .notPlus:
     cmp byte [inputBuffer], 'n'
     jne .notNumOfDig
+    isEmptyOpStack
+    cmp eax, 1 
+    je .error_insufficent
     call numberOfDigits
     jmp .calc_loop
     .notNumOfDig:
-    cmp byte [inputBuffer], 'l'
-    jne .notLength
-    popOp eax
-    push eax
-    call listLength
-    printfMacro eax, hex_format
-    add esp, 4
-    jmp .calc_loop
-    .notLength:
     .loop_cont:
+    isFullOpStack
+    cmp eax, 1
+    je .error_full
     createListAndPush inputBuffer
     jmp .calc_loop
+
+    .error_insufficent:
+    printInfo "Error: Insufficient Number of Arguments on Stack"
+    jmp .calc_loop
+    .error_full:
+    printInfo "Error: Operand Stack Overflow"
+    jmp .calc_loop
+    
     .end_calc_loop:
 
-
+    dec dword [numOfOp]
+    printfMacro dword [numOfOp], hex_format_withNl
+    
+    call freeStack
+    
     popad
     pop ebp
     ret
-
 ;;ebx length
 ;;edx num of zeros
 listLength:
@@ -357,6 +413,26 @@ numberOfDigits:
     ret
 
 
+freeStack:
+    push ebp
+    mov ebp, esp
+    pushad
+    
+    .free_loop:
+    isEmptyOpStack
+    cmp eax, 0
+    jne .end_free_loop
+    popOp eax
+    push eax
+    call freeList
+    add esp, 4
+    jmp .free_loop
+    .end_free_loop:
+
+    popad
+    pop ebp
+    ret
+
 createListFromNumber:
     push ebp
     mov ebp, esp
@@ -390,12 +466,8 @@ plusOperator:
     sub esp, 16
 
     popOp eax
-    cmp ebx, 0
-    je .end
     mov [ebp - 4], eax
     popOp ecx
-    cmp ebx, 0
-    je .end
     mov [ebp - 8], ecx
 
     mov eax, [ebp - 4] 
@@ -491,8 +563,6 @@ popAndPrint:
     pushad
 
     popOp eax
-    cmp ebx, 0
-    je .end
     mov ecx, eax
     push eax
     call printListWithoutLeadingZeros
@@ -500,7 +570,7 @@ popAndPrint:
     push ecx
     call freeList
     add esp, 4
-    printStr ""
+    printInfo ""
     .end:
     
     popad
@@ -513,12 +583,8 @@ orOperator:
     pushad
     sub esp, 16
     popOp eax
-    cmp ebx, 0
-    je .end
     mov [ebp - 4], eax
     popOp ecx
-    cmp ebx, 0
-    je .end
     mov [ebp - 8], ecx
 
     mov eax, [ebp - 4] 
@@ -574,7 +640,11 @@ orOperator:
     mov eax, [ebp - 4]
     pushOp eax
 
-    
+    mov eax, [ebp - 8]
+    push eax
+    call freeList
+    add esp, 4
+
     .end:
     add esp, 16
     popad
@@ -588,12 +658,8 @@ andOperator:
     pushad
     sub esp, 16
     popOp eax
-    cmp ebx, 0
-    je .end
     mov [ebp - 4], eax
     popOp ecx
-    cmp ebx, 0
-    je .end
     mov [ebp - 8], ecx
 
     mov eax, [ebp - 4] 
@@ -668,8 +734,6 @@ duplicate:
     sub esp, 4
 
     peekOp ecx ; headp of the list to dup 
-    cmp ebx, 0
-    je .end
 
     allocate 4
     mov [ebp - 4], eax
@@ -716,9 +780,10 @@ strToDecimal:
 		jz end_loop
 		cmp byte [ecx], 0
 		jz end_loop
-		mov bl, [ecx]
-		sub bl, '0'
-		imul eax, 10
+        mov ebx, 0
+        mov bl, byte [ecx]
+        hexCharConvertor ebx
+		imul eax, 16
 		add eax, ebx
 		inc ecx
 		jmp for_loop
