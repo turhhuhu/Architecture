@@ -18,10 +18,9 @@ section .data
     p: dd 0
     opsp: dd opStack
     debug: db 0
-
+    size: dd 5
 section .bss
     opStack: resd 256
-    size: resd 1
     inputBuffer: resb MAX_USER_INPUT
 
 section .rodata
@@ -224,37 +223,33 @@ main:
     push ebp 
     mov ebp, esp
     pushad
-
-    mov eax, 0
-    mov eax, [ebp + 8] ;; eax holds argc
-    cmp eax, 2
-    jge .userOpStackSizeInput
-    mov eax, 5 ;; eax holds default stack size
-    jmp .initStack
-    .userOpStackSizeInput:
-    mov eax, [ebp + 12] ;; argv
-    mov eax, [eax + 4] ;; eax holds user string operand stack size
+    
+    mov ecx, [ebp + 8]
+    mov ebx, 1
+    .flag_loop:
+    cmp ebx, ecx
+    je .end_flag_loop
+    mov eax, [ebp + 12]
+    mov eax,dword [eax + 4*ebx]
+    cmp byte [eax], '-'
+    jne .not_debug
+    cmp byte [eax + 1], 'd'
+    jne .not_debug
+    mov byte [debug], 1
+    jmp .debug
+    .not_debug:
     push eax
     call strToDecimal
     add esp, 4
-    ;; eax now has decimal stack size
-    .initStack:
-    mov [size], eax
-
-    mov eax, [ebp + 8]
-    cmp eax, 3
-    jb .notdebug
-    mov eax, [ebp + 12]
-    mov eax, [eax + 8]
-    cmp byte [eax], '-'
-    jne .notdebug
-    cmp byte [eax + 1], 'd'
-    jne .notdebug
-    mov byte [debug], 1
-    .notdebug:
+    mov dword [size], eax
+    .debug:
+    inc ebx
+    jmp .flag_loop
+    .end_flag_loop:
 
     call myCalc
-
+    mov ebx, [stdout]
+    fprintfM ebx, format, eax
 
     popad
     pop ebp
@@ -263,7 +258,9 @@ main:
 myCalc:
     push ebp
     mov ebp, esp
-    pushad
+    push ebx
+    push ecx
+    push edx
     sub esp, 4
 
     mov dword [ebp - 4], 0
@@ -344,21 +341,25 @@ myCalc:
    
     .error_insufficent:
     printInfo "Error: Insufficient Number of Arguments on Stack"
+    dec dword [ebp - 4]
     jmp .calc_loop
     .error_full:
     printInfo "Error: Operand Stack Overflow"
+    dec dword [ebp - 4]
     jmp .calc_loop
     
     .end_calc_loop:
 
     dec dword [ebp - 4]
-    mov eax, [stdout]
-    fprintfM eax, hex_format_withNl, dword [ebp - 4]
     
     call freeStack
     
+    mov eax, dword [ebp - 4]
+    
     add esp, 4
-    popad
+    pop edx
+    pop ecx
+    pop ebx
     pop ebp
     ret
 ;;ebx length
@@ -414,6 +415,7 @@ numberOfDigits:
     popOp eax
     mov ecx, eax
     mov ebx, [eax]
+    mov edx, 0
     push eax
     call listLength
     add esp, 4
@@ -421,7 +423,8 @@ numberOfDigits:
     .advance_loop:
     cmp dword [ebx + 1], 0
     je .end_advance_loop
-    mov ebx, [ebx + 1]
+    mov ebx, dword [ebx + 1]
+    jmp .advance_loop
     .end_advance_loop:
     mov edx, 0
     mov dl, byte [ebx]
@@ -804,6 +807,9 @@ duplicate:
 strToDecimal:
     push ebp
     mov ebp, esp
+    push ebx
+    push ecx
+    push edx
 
     mov ecx, dword [ebp+8]
 	mov eax, 0
@@ -822,6 +828,9 @@ strToDecimal:
 		jmp for_loop
 	end_loop:
 
+    pop edx
+    pop ecx
+    pop ebx
     pop ebp
     ret
     
