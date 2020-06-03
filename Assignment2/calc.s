@@ -249,7 +249,7 @@ main:
 
     call myCalc
     mov ebx, [stdout]
-    fprintfM ebx, format, eax
+    fprintfM ebx, hex_format_withNl, eax
 
     popad
     pop ebp
@@ -341,11 +341,9 @@ myCalc:
    
     .error_insufficent:
     printInfo "Error: Insufficient Number of Arguments on Stack"
-    dec dword [ebp - 4]
     jmp .calc_loop
     .error_full:
     printInfo "Error: Operand Stack Overflow"
-    dec dword [ebp - 4]
     jmp .calc_loop
     
     .end_calc_loop:
@@ -419,16 +417,18 @@ numberOfDigits:
     push eax
     call listLength
     add esp, 4
+    mov edx, eax
     imul eax, 2
     .advance_loop:
-    cmp dword [ebx + 1], 0
-    je .end_advance_loop
+    cmp edx, 1
+    jbe .end_advance_loop
     mov ebx, dword [ebx + 1]
+    dec edx
     jmp .advance_loop
     .end_advance_loop:
     mov edx, 0
     mov dl, byte [ebx]
-    cmp byte [ebx], 16
+    cmp dl, 16
     jae .2Digits
     sub eax, 1
     jmp .end
@@ -561,13 +561,18 @@ plusOperator:
     setc dh
     cmp dh, 0
     je .noCarry
-    cmp dword [eax + 1], 0
+
+    .carry_loop:
+    cmp dword eax, 0
     je .newNode
-    .noNewNode:
-    mov eax, dword [eax + 1]
-    add byte [eax], 1
     mov dword [ebp - 12], eax
-    jnc .noCarry
+    mov eax, dword [eax + 1]
+    cmp dword eax, 0
+    je .newNode
+    add byte [eax], 1
+    jc .carry_loop
+    .end_carry_loop:
+    jmp .noCarry
     .newNode:
     allocate NODE_SIZE
     mov byte [eax], 1
@@ -732,9 +737,9 @@ andOperator:
 
     .end_length_compare:
     mov ecx, eax
-    .or_loop:
+    .and_loop:
     cmp ecx, 0
-    je .end_or_loop
+    je .end_and_loop
     mov eax, [ebp - 16]
     mov ebx, [ebp - 12]
     mov dl, [ebx]
@@ -745,8 +750,8 @@ andOperator:
     mov [ebp - 16], eax
     mov [ebp - 12], ebx
     sub ecx, 1
-    jmp .or_loop
-    .end_or_loop:
+    jmp .and_loop
+    .end_and_loop:
 
     mov eax, [ebp - 8]
     pushOp eax
