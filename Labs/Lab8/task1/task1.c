@@ -134,12 +134,35 @@ void quit(state *s)
     exit(0);
 }
 
+void printSectionNames(state *s)
+{
+    if(s -> currentFd == -1)
+    {
+        printf("invalid fd\n");
+        return;
+    }
+    unsigned int section_header_size = s -> header -> e_shentsize;
+    unsigned int section_headers_offset = s -> header -> e_shoff;
+    Elf32_Shdr *section_headers_str_table_header = (Elf32_Shdr*)((s -> map_start) + section_headers_offset + (s -> header -> e_shstrndx * section_header_size));
+    int section_headers_str_table_offset = section_headers_str_table_header -> sh_offset;
+    char *shstrtab = (char*)(s -> map_start + section_headers_str_table_offset);
+    int section_headers_table_size = s -> header -> e_shnum;
+    printf("%-6s%-24s%-12s%-12s%-12s%-12s\n", "[Nr]", "Name", "Addr", "Off", "Size", "Type");
+    for(int i = 0; i < section_headers_table_size; i ++)
+    {
+        Elf32_Shdr *current_header = (Elf32_Shdr*)((s -> map_start) + section_headers_offset + section_header_size*i);
+        char *name = (char*)(shstrtab + current_header -> sh_name);
+        printf("%-6d%-24s%#-12x%#-12x%#-12x%#-12x\n", i, name,
+         current_header -> sh_addr, current_header -> sh_offset, current_header -> sh_size, current_header -> sh_type);
+    }
+}
 
 int main(int argc, char **argv)
 {
     int boundary, input = -1;
     char inputAsString[MAX_INPUT_SIZE];
-    struct fun_desc menu[] = {{"Toggle Debug Mode", toggleDebug}, {"Examine ELF File", examineElf}, {"Quit", quit}, {NULL, NULL}};
+    struct fun_desc menu[] = {{"Toggle Debug Mode", toggleDebug}, {"Examine ELF File", examineElf}, {"Print Section Names", printSectionNames},
+                             {"Quit", quit}, {NULL, NULL}};
     boundary = getBoundary(menu);
     state s;
     s.currentFd = -1;
