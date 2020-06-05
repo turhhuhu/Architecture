@@ -221,12 +221,48 @@ void printSymbols(state *s)
     }
 }
 
+void printReloc(state *s)
+{
+    if (s->currentFd == -1)
+    {
+        printf("invalid fd\n");
+        return;
+    }
+    unsigned int section_header_size = s->header->e_shentsize;
+    unsigned int section_headers_offset = s->header->e_shoff;
+    Elf32_Shdr *section_headers_str_table_header = (Elf32_Shdr *)((s->map_start) + section_headers_offset + (s->header->e_shstrndx * section_header_size));
+    int section_headers_str_table_offset = section_headers_str_table_header->sh_offset;
+    char *shstrtab = (char *)(s->map_start + section_headers_str_table_offset);
+    int section_headers_table_size = s->header->e_shnum;
+    printf(" %-12s%-12s\n", "Offset", "Info");
+    for (int i = 0; i < section_headers_table_size; i++)
+    {
+        Elf32_Shdr *current_header = (Elf32_Shdr *)((s->map_start) + section_headers_offset + section_header_size * i);
+        int header_type = current_header -> sh_type;
+        char *name = (char *)(shstrtab + current_header->sh_name);
+        if (header_type == SHT_REL)
+        {
+            Elf32_Shdr *rel_header = current_header;
+            int rel_offset = rel_header->sh_offset;
+            int rel_size = rel_header->sh_size;
+            int number_of_rel = rel_size / sizeof(Elf32_Rel);
+            for(int i = 0; i < number_of_rel; i++)
+            {
+                Elf32_Rel *current_rel = (Elf32_Rel *)((s->map_start) + rel_offset + sizeof(Elf32_Rel) * i);
+                int offset = current_rel -> r_offset;
+                int info = current_rel -> r_info;
+                printf("%#-12x%#-12x\n", offset, info);
+            }
+        }
+    }
+}
+
 int main(int argc, char **argv)
 {
     int boundary, input = -1;
     char inputAsString[MAX_INPUT_SIZE];
-    struct fun_desc menu[] = {{"Toggle Debug Mode", toggleDebug}, {"Examine ELF File", examineElf},{"Print Section Names", printSectionNames},
-     {"Print Symbols", printSymbols}, {"Quit", quit}, {NULL, NULL}};
+    struct fun_desc menu[] = {{"Toggle Debug Mode", toggleDebug}, {"Examine ELF File", examineElf}, {"Print Section Names", printSectionNames},
+     {"Print Symbols", printSymbols}, {"Relocation Tables", printReloc}, {"Quit", quit}, {NULL, NULL}};
     boundary = getBoundary(menu);
     state s;
     s.currentFd = -1;

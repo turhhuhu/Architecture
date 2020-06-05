@@ -65,6 +65,13 @@ void toggleDebug(state *s)
 
 void examineElf(state *s)
 {
+    if(s -> currentFd != -1)
+    {
+        if (close(s->currentFd) < 0)
+        {
+            perror("error in close");
+        }
+    }
     s->currentFd = -1;
     char fileName[MAX_FILE_NAME];
     printf("enter ELF file name: ");
@@ -95,13 +102,11 @@ void examineElf(state *s)
         if (close(s->currentFd) < 0)
         {
             perror("error in close");
-            exit(-1);
         }
         s->currentFd = -1;
         if (munmap(s->map_start, s->fd_stat.st_size) < 0)
         {
             perror("error in unmap");
-            exit(-1);
         }
         return;
     }
@@ -184,7 +189,7 @@ void printSymbols(state *s)
             int symtab_offset = symtab_header->sh_offset;
             int symtab_size = symtab_header->sh_size;
             int associated_str_tab_index = symtab_header->sh_link;
-            Elf32_Shdr *associated_str_tab_header = ((s->map_start) + section_headers_offset + section_header_size * associated_str_tab_index);
+            Elf32_Shdr *associated_str_tab_header = (Elf32_Shdr *)((s->map_start) + section_headers_offset + section_header_size * associated_str_tab_index);
             int associated_str_tab_offset = associated_str_tab_header->sh_offset;
             char *strtab = (char *)(s->map_start + associated_str_tab_offset);
             int number_of_symbols = symtab_size / sizeof(Elf32_Sym);
@@ -221,12 +226,63 @@ void printSymbols(state *s)
     }
 }
 
+void printReloc(state *s)
+{
+    if (s->currentFd == -1)
+    {
+        printf("invalid fd\n");
+        return;
+    }
+    unsigned int section_header_size = s->header->e_shentsize;
+    unsigned int section_headers_offset = s->header->e_shoff;
+    Elf32_Shdr *section_headers_str_table_header = (Elf32_Shdr *)((s->map_start) + section_headers_offset + (s->header->e_shstrndx * section_header_size));
+    int section_headers_str_table_offset = section_headers_str_table_header->sh_offset;
+    char *shstrtab = (char *)(s->map_start + section_headers_str_table_offset);
+    int section_headers_table_size = s->header->e_shnum;
+    for (int i = 0; i < section_headers_table_size; i++)
+    {
+        Elf32_Shdr *current_header = (Elf32_Shdr *)((s->map_start) + section_headers_offset + section_header_size * i);
+        int header_type = current_header -> sh_type;
+        char *name = (char *)(shstrtab + current_header->sh_name);
+        if (header_type == SHT_REL)
+        {
+            Elf32_Shdr *rel_header = current_header;
+            int rel_offset = rel_header->sh_offset;
+            int rel_size = rel_header->sh_size;
+            int number_of_rel = rel_size / sizeof(Elf32_Rel);
+            int dynsym_header_index = rel_header -> sh_link;
+            Elf32_Shdr *dynsym_header = (Elf32_Shdr *)((s->map_start) + section_headers_offset + section_header_size * dynsym_header_index);
+            int dynsyn_table_offset = dynsym_header -> sh_offset;
+            int associated_str_tab_index = dynsym_header -> sh_link;
+            Elf32_Shdr *associated_str_tab_header = (Elf32_Shdr *)((s->map_start) + section_headers_offset + section_header_size * associated_str_tab_index);
+            int associated_str_tab_offset = associated_str_tab_header->sh_offset;
+            char *strtab = (char *)(s->map_start + associated_str_tab_offset);
+            printf("Relocation section '%s' at offset 0x340 contains 8 entries:\n", name);
+            printf(" %-12s%-11s%-9s%-12s%-12s\n", "Offset", "Info", "Type", "Sym.value", "Sym. name");
+            for(int i = 0; i < number_of_rel; i++)
+            {
+                Elf32_Rel *current_rel = (Elf32_Rel *)((s->map_start) + rel_offset + sizeof(Elf32_Rel) * i);
+                int offset = current_rel -> r_offset;
+                int info = current_rel -> r_info;
+                int symbol_offset = ELF32_R_SYM(info);
+                Elf32_Sym *current_symbol = (Elf32_Sym *)((s->map_start) + dynsyn_table_offset + sizeof(Elf32_Sym)*symbol_offset);
+                int sym_index_in_strtab = current_symbol -> st_name;
+                char *name = (char *)(strtab + sym_index_in_strtab);
+                int value = current_symbol -> st_value;
+                int type = ELF32_R_TYPE(info);
+                printf("%#-12x%#-12x%-9d%#-12x%-12s\n", offset, info, type, value, name);
+            }
+            printf("\n");
+        }
+    }
+}
+
 int main(int argc, char **argv)
 {
     int boundary, input = -1;
     char inputAsString[MAX_INPUT_SIZE];
-    struct fun_desc menu[] = {{"Toggle Debug Mode", toggleDebug}, {"Examine ELF File", examineElf},{"Print Section Names", printSectionNames},
-     {"Print Symbols", printSymbols}, {"Quit", quit}, {NULL, NULL}};
+    struct fun_desc menu[] = {{"Toggle Debug Mode", toggleDebug}, {"Examine ELF File", examineElf}, {"Print Section Names", printSectionNames},
+     {"Print Symbols", printSymbols}, {"Relocation Tables", printReloc}, {"Quit", quit}, {NULL, NULL}};
     boundary = getBoundary(menu);
     state s;
     s.currentFd = -1;
