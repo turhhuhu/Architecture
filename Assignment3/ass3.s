@@ -14,7 +14,10 @@ global do_resume
     
 section .rodata
     str_format: db "%s", 0
-    format: db "%d", 10, 0
+    int_format: db "%d", 10, 0 
+    float_format: db "%.2f", 10, 0
+    MAX_INT: dd 65535
+    sub1: dd 60
 section .bss
     global CURR
     global SPT
@@ -25,10 +28,19 @@ section .bss
     SPMAIN: resd 1 ; stack pointer of main
     STKSZ: equ 16*1024
     SCHEDULER_CO: equ 0
+    PRINTER_CO: equ 1
+    TARGET_CO: equ 2
     CORS: resd 1
     numCos: resd 1
-
+    random_num:
     STK_OFF: equ 4
+    SEED: resd 1
+    RAND: resd 1
+    float_temp: resq 1
+    X_Coord: resd 1
+    Y_Coord: resd 1
+    speed: resd 1
+    heading: resd 1    
 
 ;returns co-routine address in ebx
 %macro get_co 1
@@ -38,6 +50,19 @@ section .bss
     imul ecx, 8
     add ebx, ecx
     pop ecx
+%endmacro
+
+;; print_float(float f)
+%macro print_float_num 1
+
+    fld %1
+    fstp qword [float_temp]    
+    push dword [float_temp + 4]
+    push dword [float_temp]    
+    push float_format      
+    call printf
+    add esp, 12
+
 %endmacro
 
 %macro alloc_co 2
@@ -83,10 +108,57 @@ main:
     mov ebp, esp
     mov dword [numCos], 5
     call initAllCors
+    call initDrones
     call start_schedule
     pop ebp
     ret
 
+
+initDrones:
+    push ebp
+    mov ebp, esp
+    pushad
+    mov ecx, [numCos]
+    dec ecx
+    .init_loop:
+    cmp ecx, 2
+    je .end_init_loop
+
+    push 100
+    call get_scaled_random
+    add esp, 4
+    mov dword [X_Coord], eax
+    
+    push 100
+    call get_scaled_random
+    add esp, 4
+    mov dword [Y_Coord], eax
+
+    push 360
+    call get_scaled_random
+    add esp, 4
+    mov dword [heading], eax
+
+    push 100
+    call get_scaled_random
+    add esp,4
+    mov dword [speed], eax
+    
+    get_co ecx
+    mov dword [SPT], esp
+    mov esp, dword [ebx + STK_OFF]
+    push dword [heading]
+    push dword [Y_Coord]
+    push dword [X_Coord]
+    push 0
+    mov esp, dword [SPT]
+    dec ecx
+    jmp .init_loop
+    .end_init_loop:
+    popad
+    pop ebp
+    ret
+    
 initAllCors:
     push ebp
     mov ebp, esp
@@ -182,3 +254,102 @@ do_resume: ; load ESP for resumed co-routine
     popad ; restore resumed co-routine state
     popfd
     ret ; "return" to resumed co-routine  
+
+
+    
+LFSR:
+    push ebp 
+    mov ebp, esp
+    pushad
+
+    mov ax, [SEED]  ; ax = currRand = x
+    mov cx, ax      ; cx = x >> 0    
+
+    mov bx, ax
+    shr bx, 2       ; bx = x >> 2
+    xor cx, bx      ; cx = x >> 0 ^ x >> 2
+
+    mov bx, ax      
+    shr bx, 3       ; bx = x >> 3
+    xor cx, bx      ; cx = x >> 0 ^ x >> 2 ^ x >> 3
+
+    mov bx, ax 
+    shr bx, 5       ; bx = x >> 5
+    xor cx, bx      ; cx = x >> 0 ^ x >> 2 ^ x >> 3 ^ x >> 5
+
+
+    mov bx, ax      
+    shr bx, 1       ; bx = x >> 1 
+    shl cx, 15      ; cx = bit << 15 
+    or bx, cx       ; bx = x >> 1 | bit << 15
+
+    mov eax, 0
+    mov ax, bx      ; eax = 0...0bx
+    mov [SEED], eax
+
+    popad
+    pop ebp
+    ret
+
+
+
+next_LFSR_bit:
+    push ebx
+    push ecx
+    push edx
+
+    mov eax, 0
+    mov ax, [SEED]
+    mov ebx, 0
+
+    mov bx, ax
+
+    shr ax, 2
+    xor bx, ax
+
+    shr ax, 1
+    xor bx, ax
+
+    shr ax, 2
+    xor bx, ax
+
+    shr word [SEED], 1
+    shl bx, 15
+    or word [SEED], bx
+
+    pop edx
+    pop ecx
+    pop ebx
+    ret
+
+get_scaled_random:
+    push ebp
+    mov ebp, esp
+    push ebx
+    push ecx
+    push edx
+
+    mov ecx, 16
+    mov ebx, 0
+    .generate_num_loop:
+    cmp ecx, 0
+    je .end_loop
+    call next_LFSR_bit
+    dec ecx
+    jmp .generate_num_loop
+    .end_loop:
+
+    fild dword [SEED] ; st(1)
+    fild dword [MAX_INT] ; st(0)
+    fdivp; st(1) / st(0)
+    fild dword [ebp + 8]
+    fmul
+    fisub dword [sub1]
+    fstp dword [RAND]
+    mov eax, dword [RAND]
+
+    pop edx
+    pop ecx
+    pop ebx
+    pop ebp
+    ret

@@ -18,8 +18,12 @@ section .text
     popad
 %endmacro
 
+
+
 section .text
+
 drone_func:
     printInfo "drone"
     mov ebx, dword [CORS]
     call resume
+
