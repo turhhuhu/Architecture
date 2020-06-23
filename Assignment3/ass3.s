@@ -20,6 +20,11 @@ global board_size_max
 global board_size_min
 global get_scaled_random
 global RAND
+global PREV
+global numCos
+global R
+global K
+extern createTarget
 section .rodata
     str_format: db "%s", 0
     int_format: db "%d", 10, 0 
@@ -29,6 +34,7 @@ section .rodata
     board_size_min: dd 0.0
 section .bss
     CURR: resd 1
+    PREV: resd 1
     SPT: resd 1 ; temporary stack pointer
     SPMAIN: resd 1 ; stack pointer of main
     STKSZ: equ 16*1024
@@ -39,25 +45,27 @@ section .bss
     numCos: resd 1
     random_num:
     STK_OFF: equ 4
+    shouldStop_OFF: equ 8
     SEED: resd 1
     RAND: resd 1
     float_temp: resq 1
     X_Coord: resd 1
     Y_Coord: resd 1
     speed: resd 1
-    heading: resd 1    
+    heading: resd 1
+    R: resd 1
+    K: resd 1
 
 ;returns co-routine address in ebx
 %macro get_co 1
     push ecx
     mov ebx, dword [CORS]
     mov ecx, %1
-    imul ecx, 8
+    imul ecx, 12
     add ebx, ecx
     pop ecx
 %endmacro
 
-;; print_float(float f)
 %macro print_float_num 1
     pushad
     fld %1
@@ -111,7 +119,9 @@ section .text
 main:
     push ebp
     mov ebp, esp
-    mov dword [numCos], 5
+    mov dword [K], 10
+    mov dword [R], 10
+    mov dword [numCos], 6
     mov dword [SEED], 0xACE1
     finit
     call initAllCors
@@ -171,7 +181,7 @@ initAllCors:
     push ecx
 
     push ecx
-    push 8
+    push 12
     call calloc
     add esp, 8
     
@@ -183,18 +193,19 @@ initAllCors:
     .cors_loop:
     cmp ecx, -1
     je .end_cors_loop
-    cmp ecx, 0
+    cmp ecx, SCHEDULER_CO
     jne .not_scheduler
     alloc_co ecx, schedule_func
     jmp .init_co
     .not_scheduler:
-    cmp ecx, 1
+    cmp ecx, PRINTER_CO
     jne .not_printer
     alloc_co ecx, print_func
     jmp .init_co
     .not_printer:
-    cmp ecx, 2
+    cmp ecx, TARGET_CO
     jne .not_target
+    call createTarget
     alloc_co ecx, target_func
     jmp .init_co
     .not_target:
@@ -252,11 +263,12 @@ start_schedule:
 resume: ; save state of current co-routine
     pushfd
     pushad
-    mov edx, [CURR]
-    mov [edx + STK_OFF], esp ; save current ESP
+    mov edx, dword [CURR]
+    mov dword [PREV], edx
+    mov dword [edx + STK_OFF], esp ; save current ESP
 do_resume: ; load ESP for resumed co-routine
-    mov esp, [ebx + STK_OFF]
-    mov [CURR], ebx
+    mov esp, dword [ebx + STK_OFF]
+    mov dword [CURR], ebx
     popad ; restore resumed co-routine state
     popfd
     ret ; "return" to resumed co-routine  

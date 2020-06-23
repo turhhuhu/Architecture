@@ -9,7 +9,7 @@ extern board_size_max
 extern board_size_min
 extern get_scaled_random
 extern RAND
-
+extern createTarget
 section .rodata
     str_format: db "%s", 0
     int_format: db "%d", 10, 0 
@@ -26,6 +26,15 @@ section .text
     call printf
     add esp, 8
     popad
+%endmacro
+
+%macro get_co 1
+    push ecx
+    mov ebx, dword [CORS]
+    mov ecx, %1
+    imul ecx, 12
+    add ebx, ecx
+    pop ecx
 %endmacro
 
 %macro print_float_num 1
@@ -49,6 +58,22 @@ section .text
     popad
 %endmacro
 
+%macro push_all_stats 0
+    push dword [heading]
+    push dword [speed]
+    push dword [Y_Coord]
+    push dword [X_Coord]
+    push dword [score]
+%endmacro
+
+%macro pop_all_stats 0
+    pop dword [score]
+    pop dword [X_Coord]
+    pop dword [Y_Coord]
+    pop dword [speed]
+    pop dword [heading]
+%endmacro
+
 section .bss
     X_Coord: resd 1
     Y_Coord: resd 1
@@ -61,6 +86,8 @@ section .bss
     distance: resd 1
     delta_speed: resd 1
     delta_heading: resd 1
+    SCHEDULER_CO: equ 0
+    TARGET_CO: equ 2
 section .data
     one_eighty: dd 180.0
     ninety: dd 90.0
@@ -78,22 +105,42 @@ section .data
 section .text
 
 drone_func:
-    pop dword [score]
-    pop dword [X_Coord]
-    pop dword [Y_Coord]
-    pop dword [speed]
-    pop dword [heading]
+    pop_all_stats
     
+
+
+    call moveDrone
+    call generateNewAngle
+    call generateNewSpeed
+
+
+    
+    .drone_loop:
+    call mayDestroy
+    cmp eax, 1
+    jne .no_destroy
+    inc dword [score]
+    push_all_stats
+    get_co TARGET_CO
+    call resume
+    pop_all_stats
+    .no_destroy:
+    call moveDrone
+    call generateNewAngle
+    call generateNewSpeed
     ; printfM int_format, dword [score]
     ; print_float_num dword [X_Coord]
     ; print_float_num dword [Y_Coord]
     ; print_float_num dword [speed]
     ; print_float_num dword [heading]
-    ;call moveDrone
-    fld dword [temp1]
-    fstp dword [speed]
-    ;call generateNewAngle
-    call generateNewSpeed
+    push_all_stats
+    printInfo "drone"
+    get_co SCHEDULER_CO
+    call resume
+    pop_all_stats
+    jmp .drone_loop
+    .end_drone_loop:
+
     ; fld dword [temp2]
     ; fst dword [X_Coord]
     ; fstp dword [Y_Coord]
@@ -105,9 +152,7 @@ drone_func:
     ;call mayDestroy
     ;printfM int_format, eax
 
-    printInfo "drone"
-    mov ebx, dword [CORS]
-    call resume
+
 
 generateNewAngle:
     push ebp
@@ -117,11 +162,13 @@ generateNewAngle:
     call get_scaled_random
     add esp, 4
     
+    finit
     fld dword [RAND]
     fld dword [sixty]
     fsubp
     fld dword [heading]
     faddp
+    fst dword [heading]
     fld dword [max_angle]
     fcomi
     ja .angle_not_above
@@ -139,8 +186,6 @@ generateNewAngle:
     fstp dword [heading]
     .after_change:
 
-
-
     add eax, dword [heading]
     pop ebp
     ret
@@ -153,14 +198,13 @@ generateNewSpeed:
     call get_scaled_random
     add esp, 4
 
-    fld dword [temp2]
-    fstp dword [RAND]
-
+    finit
     fld dword [RAND]
     fld dword [ten]
     fsubp
     fld dword [speed]
     faddp
+    fst dword [speed]
     fld dword [max_speed]
     fcomi
     ja .speed_not_above
@@ -175,13 +219,13 @@ generateNewSpeed:
     fstp dword [speed]
     fstp st0
     .after_change:
-
-    print_float_num dword [speed]
+    
 
     pop ebp
     ret
 
 moveDrone:
+    finit
     fld dword [heading]
     fldpi
     fmulp
@@ -207,7 +251,7 @@ moveDrone:
     fld dword [X_Coord]
     fcomi
     jb .x_not_above
-    printInfo "x above"
+    ;printInfo "x above"
     fsub st1
     fstp dword [X_Coord]
     .x_not_above:
@@ -215,7 +259,7 @@ moveDrone:
     fld dword [Y_Coord]
     fcomi
     jb .y_not_above
-    printInfo "y above"
+    ;printInfo "y above"
     fsub st1
     fstp dword [Y_Coord]
     .y_not_above:
@@ -227,7 +271,7 @@ moveDrone:
     fld dword [X_Coord]
     fcomi
     ja .x_not_below
-    printInfo "x below"
+    ;printInfo "x below"
     fld dword [board_size_max]
     fadd st1
     fstp dword [X_Coord]
@@ -236,7 +280,7 @@ moveDrone:
     fld dword [Y_Coord]
     fcomi
     ja .y_not_below
-    printInfo "y below"
+    ;printInfo "y below"
     fld dword [board_size_max]
     fadd st1
     fstp dword [Y_Coord]
@@ -247,6 +291,7 @@ moveDrone:
     ret
 
 mayDestroy:
+    finit
     fld dword [target_X]
     fld dword [X_Coord]
     fsubp ;  (target_X - caller_X) in st(0)
@@ -262,7 +307,6 @@ mayDestroy:
     faddp ; (dy)^2 + (dx)^2 in st(0)
     fsqrt
     fst dword [target_distance]
-    print_float_num dword [target_distance]
     fld dword [MAX_distance]
     mov eax, 0
     fcomip
