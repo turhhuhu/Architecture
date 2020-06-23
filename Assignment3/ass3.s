@@ -18,6 +18,8 @@ global SPMAIN
 global STKSZ
 global board_size_max
 global board_size_min
+global get_scaled_random
+global RAND
 section .rodata
     str_format: db "%s", 0
     int_format: db "%d", 10, 0 

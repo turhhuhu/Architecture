@@ -3,6 +3,13 @@ extern printf
 extern CORS
 extern resume
 extern float_temp
+extern target_X
+extern target_Y
+extern board_size_max
+extern board_size_min
+extern get_scaled_random
+extern RAND
+
 section .rodata
     str_format: db "%s", 0
     int_format: db "%d", 10, 0 
@@ -42,11 +49,6 @@ section .text
     popad
 %endmacro
 
-extern target_X
-extern target_Y
-extern board_size_max
-extern board_size_min
-
 section .bss
     X_Coord: resd 1
     Y_Coord: resd 1
@@ -57,12 +59,21 @@ section .bss
     target_distance: resd 1
     MAX_distance: resd 1
     distance: resd 1
+    delta_speed: resd 1
+    delta_heading: resd 1
 section .data
     one_eighty: dd 180.0
     ninety: dd 90.0
+    sixty: dd 60.0
+    ten: dd 10.0
+    hundred: dd 100.0
+    max_angle: dd 360.0
+    min_angle: dd 0.0
+    max_speed: dd 100.0
+    min_speed: dd 0.0
     score: dd 0
-    temp1: dd 10.0
-    temp2: dd 20.0
+    temp1: dd 1.0
+    temp2: dd 0.0
 
 section .text
 
@@ -74,33 +85,101 @@ drone_func:
     pop dword [heading]
     
     ; printfM int_format, dword [score]
-    print_float_num dword [X_Coord]
+    ; print_float_num dword [X_Coord]
     ; print_float_num dword [Y_Coord]
     ; print_float_num dword [speed]
     ; print_float_num dword [heading]
-
-    call moveDrone
-    call generateRandoms
-    print_float_num dword [X_Coord]
-    
+    ;call moveDrone
+    fld dword [temp1]
+    fstp dword [speed]
+    ;call generateNewAngle
+    call generateNewSpeed
     ; fld dword [temp2]
     ; fst dword [X_Coord]
-    ; fst dword [MAX_distance]
     ; fstp dword [Y_Coord]
     ; fld dword [temp1]
     ; fst dword [target_X]
     ; fstp dword [target_Y]
 
 
-    call mayDestroy
-    printfM int_format, eax
+    ;call mayDestroy
+    ;printfM int_format, eax
 
     printInfo "drone"
     mov ebx, dword [CORS]
     call resume
 
-generateRandoms:
+generateNewAngle:
+    push ebp
+    mov ebp, esp
 
+    push 120
+    call get_scaled_random
+    add esp, 4
+    
+    fld dword [RAND]
+    fld dword [sixty]
+    fsubp
+    fld dword [heading]
+    faddp
+    fld dword [max_angle]
+    fcomi
+    ja .angle_not_above
+    fsub 
+    fstp dword [heading]
+    jmp .after_change
+    .angle_not_above:
+    fstp st0
+    fld dword [min_angle]
+    fcomi
+    jb .after_change
+    fstp st0
+    fld dword [max_angle]
+    faddp
+    fstp dword [heading]
+    .after_change:
+
+
+
+    add eax, dword [heading]
+    pop ebp
+    ret
+
+generateNewSpeed:
+    push ebp
+    mov ebp, esp
+
+    push 20
+    call get_scaled_random
+    add esp, 4
+
+    fld dword [temp2]
+    fstp dword [RAND]
+
+    fld dword [RAND]
+    fld dword [ten]
+    fsubp
+    fld dword [speed]
+    faddp
+    fld dword [max_speed]
+    fcomi
+    ja .speed_not_above
+    fstp dword [speed]
+    fstp st0
+    jmp .after_change
+    .speed_not_above:
+    fstp st0
+    fld dword [min_speed]
+    fcomi
+    jb .after_change
+    fstp dword [speed]
+    fstp st0
+    .after_change:
+
+    print_float_num dword [speed]
+
+    pop ebp
+    ret
 
 moveDrone:
     fld dword [heading]
@@ -123,38 +202,47 @@ moveDrone:
     fadd dword [heading]
     fstp dword [heading]
 
+
     fld dword [board_size_max]
     fld dword [X_Coord]
     fcomi
     jb .x_not_above
-    printInfo "here"
-    fsub dword [X_Coord]
+    printInfo "x above"
+    fsub st1
+    fstp dword [X_Coord]
     .x_not_above:
-    fstp dword [temp1]
-    print_float_num dword [temp1]
+    fstp st0
     fld dword [Y_Coord]
     fcomi
     jb .y_not_above
-    fsub dword [Y_Coord]
+    printInfo "y above"
+    fsub st1
+    fstp dword [Y_Coord]
     .y_not_above:
-    fstp
-    fstp
+    fstp st0
+    fstp st0
+    
+    
     fld dword [board_size_min]
     fld dword [X_Coord]
     fcomi
     ja .x_not_below
+    printInfo "x below"
     fld dword [board_size_max]
-    fadd dword [X_Coord]
+    fadd st1
+    fstp dword [X_Coord]
     .x_not_below:
-    fstp
-    fstp
+    fstp st0
     fld dword [Y_Coord]
     fcomi
     ja .y_not_below
+    printInfo "y below"
     fld dword [board_size_max]
-    fadd dword [Y_Coord]
+    fadd st1
+    fstp dword [Y_Coord]
     .y_not_below:
-
+    fstp st0
+    fstp st0
 
     ret
 
