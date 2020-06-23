@@ -11,18 +11,21 @@ global CORS
 global CURR
 global resume
 global do_resume
-    
+global float_temp
+global CURR
+global SPT
+global SPMAIN
+global STKSZ
+global board_size_max
+global board_size_min
 section .rodata
     str_format: db "%s", 0
     int_format: db "%d", 10, 0 
     float_format: db "%.2f", 10, 0
     MAX_INT: dd 65535
-    sub1: dd 60
+    board_size_max: dd 100.0
+    board_size_min: dd 0.0
 section .bss
-    global CURR
-    global SPT
-    global SPMAIN
-    global STKSZ
     CURR: resd 1
     SPT: resd 1 ; temporary stack pointer
     SPMAIN: resd 1 ; stack pointer of main
@@ -54,7 +57,7 @@ section .bss
 
 ;; print_float(float f)
 %macro print_float_num 1
-
+    pushad
     fld %1
     fstp qword [float_temp]    
     push dword [float_temp + 4]
@@ -62,7 +65,7 @@ section .bss
     push float_format      
     call printf
     add esp, 12
-
+    popad
 %endmacro
 
 %macro alloc_co 2
@@ -107,54 +110,52 @@ main:
     push ebp
     mov ebp, esp
     mov dword [numCos], 5
+    mov dword [SEED], 0xACE1
+    finit
     call initAllCors
-    call initDrones
     call start_schedule
     pop ebp
     ret
 
 
-initDrones:
+initDrone:
     push ebp
     mov ebp, esp
     pushad
-    mov ecx, [numCos]
-    dec ecx
-    .init_loop:
-    cmp ecx, 2
-    je .end_init_loop
+    mov ecx, [ebp + 8]
+
 
     push 100
     call get_scaled_random
     add esp, 4
     mov dword [X_Coord], eax
-    
+
     push 100
     call get_scaled_random
     add esp, 4
     mov dword [Y_Coord], eax
 
-    push 360
-    call get_scaled_random
-    add esp, 4
-    mov dword [heading], eax
-
     push 100
     call get_scaled_random
     add esp,4
     mov dword [speed], eax
+
+    push 360
+    call get_scaled_random
+    add esp, 4
+    mov dword [heading], eax
     
+
     get_co ecx
     mov dword [SPT], esp
     mov esp, dword [ebx + STK_OFF]
     push dword [heading]
+    push dword [speed]
     push dword [Y_Coord]
     push dword [X_Coord]
     push 0
+    mov dword [ebx + STK_OFF], esp
     mov esp, dword [SPT]
-    dec ecx
-    jmp .init_loop
-    .end_init_loop:
     popad
     pop ebp
     ret
@@ -196,6 +197,9 @@ initAllCors:
     jmp .init_co
     .not_target:
     alloc_co ecx, drone_func
+    push ecx
+    call initDrone
+    add esp, 4
     .init_co:
     push ecx
     call initCo
@@ -256,43 +260,6 @@ do_resume: ; load ESP for resumed co-routine
     ret ; "return" to resumed co-routine  
 
 
-    
-LFSR:
-    push ebp 
-    mov ebp, esp
-    pushad
-
-    mov ax, [SEED]  ; ax = currRand = x
-    mov cx, ax      ; cx = x >> 0    
-
-    mov bx, ax
-    shr bx, 2       ; bx = x >> 2
-    xor cx, bx      ; cx = x >> 0 ^ x >> 2
-
-    mov bx, ax      
-    shr bx, 3       ; bx = x >> 3
-    xor cx, bx      ; cx = x >> 0 ^ x >> 2 ^ x >> 3
-
-    mov bx, ax 
-    shr bx, 5       ; bx = x >> 5
-    xor cx, bx      ; cx = x >> 0 ^ x >> 2 ^ x >> 3 ^ x >> 5
-
-
-    mov bx, ax      
-    shr bx, 1       ; bx = x >> 1 
-    shl cx, 15      ; cx = bit << 15 
-    or bx, cx       ; bx = x >> 1 | bit << 15
-
-    mov eax, 0
-    mov ax, bx      ; eax = 0...0bx
-    mov [SEED], eax
-
-    popad
-    pop ebp
-    ret
-
-
-
 next_LFSR_bit:
     push ebx
     push ecx
@@ -343,8 +310,7 @@ get_scaled_random:
     fild dword [MAX_INT] ; st(0)
     fdivp; st(1) / st(0)
     fild dword [ebp + 8]
-    fmul
-    fisub dword [sub1]
+    fmulp
     fstp dword [RAND]
     mov eax, dword [RAND]
 
