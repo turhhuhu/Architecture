@@ -18,11 +18,12 @@ section .bss
     SCHEDULER_CO: equ 0
     TARGET_CO: equ 2
     STK_OFF: equ 4
-    SCORE_OFF: equ 60
+    SCORE_OFF: equ 40
     X_OFF: equ 44
     Y_OFF: equ 48
     SPEED_OFF: equ 52
     HEADINGS_OFF:equ 56
+    shouldStop_OFF: equ 8
 
 section .text
 %macro printInfo 1
@@ -91,6 +92,8 @@ print_func:
     je .end_print_loop
     get_co ecx
     
+    cmp dword [ebx + shouldStop_OFF], 1
+    je .next_loop
 
     mov ebx, [ebx + STK_OFF]
     pushad
@@ -106,6 +109,8 @@ print_func:
     call printf
     add esp, 44
     popad
+    
+    .next_loop:
     inc ecx
     jmp .print_loop
     .end_print_loop:

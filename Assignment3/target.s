@@ -34,7 +34,6 @@ jmp %%skip_print
 target_func:
     .target_loop:
     call createTarget
-    printInfo "target"
     mov ebx, dword [PREV]
     call resume
     jmp .target_loop

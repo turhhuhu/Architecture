@@ -10,6 +10,7 @@ extern board_size_min
 extern get_scaled_random
 extern RAND
 extern createTarget
+extern Max_distance
 section .rodata
     str_format: db "%s", 0
     int_format: db "%d", 10, 0 
@@ -82,7 +83,6 @@ section .bss
     delta_X: resd 1
     delta_Y: resd 1
     target_distance: resd 1
-    MAX_distance: resd 1
     distance: resd 1
     delta_speed: resd 1
     delta_heading: resd 1
@@ -134,7 +134,7 @@ drone_func:
     ; print_float_num dword [speed]
     ; print_float_num dword [heading]
     push_all_stats
-    printInfo "drone"
+    ;printInfo "drone"
     get_co SCHEDULER_CO
     call resume
     pop_all_stats
@@ -307,7 +307,7 @@ mayDestroy:
     faddp ; (dy)^2 + (dx)^2 in st(0)
     fsqrt
     fst dword [target_distance]
-    fld dword [MAX_distance]
+    fld dword [Max_distance]
     mov eax, 0
     fcomip
     jb .no_destroy

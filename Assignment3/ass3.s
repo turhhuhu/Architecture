@@ -24,11 +24,15 @@ global PREV
 global numCos
 global R
 global K
+global Max_distance
+extern sscanf
 extern createTarget
 section .rodata
     str_format: db "%s", 0
     int_format: db "%d", 10, 0 
     float_format: db "%.2f", 10, 0
+    float_input_format: db "%f", 0
+    int_input_format: db "%d", 0
     MAX_INT: dd 65535
     board_size_max: dd 100.0
     board_size_min: dd 0.0
@@ -55,6 +59,7 @@ section .bss
     heading: resd 1
     R: resd 1
     K: resd 1
+    Max_distance: resd 1
 
 ;returns co-routine address in ebx
 %macro get_co 1
@@ -115,17 +120,39 @@ section .text
     popad
 %endmacro
 
+%macro sscanfM 3
+    push eax
+    push %1
+    push %2
+    push %3
+    call sscanf
+    add esp, 12
+    pop eax
+%endmacro
+
 section .text
 main:
     push ebp
     mov ebp, esp
-    mov dword [K], 10
-    mov dword [R], 10
-    mov dword [numCos], 6
-    mov dword [SEED], 0xACE1
+    mov eax, dword [ebp + 8]
+    cmp eax, 6
+    jae .no_err
+    printInfo "not enough arguments!"
+    jmp .end
+    .no_err:
+    mov eax, dword [ebp + 12]
+    sscanfM numCos, int_input_format, dword [eax + 4]
+    add dword [numCos], 3
+    
+    sscanfM R, int_input_format, dword [eax + 8]
+    sscanfM K, int_input_format, dword [eax + 12]
+    sscanfM Max_distance, float_input_format, dword [eax + 16]
+    sscanfM SEED, int_input_format, dword [eax + 20]
+
     finit
     call initAllCors
     call start_schedule
+    .end:
     pop ebp
     ret
 
@@ -159,6 +186,7 @@ initDrone:
     
 
     get_co ecx
+    mov dword [ebx + shouldStop_OFF], 0
     mov dword [SPT], esp
     mov esp, dword [ebx + STK_OFF]
     push dword [heading]
@@ -320,6 +348,7 @@ get_scaled_random:
     jmp .generate_num_loop
     .end_loop:
 
+    finit
     fild dword [SEED] ; st(1)
     fild dword [MAX_INT] ; st(0)
     fdivp; st(1) / st(0)
