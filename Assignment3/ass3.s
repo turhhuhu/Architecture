@@ -39,46 +39,30 @@ section .rodata
     board_size_max: dd 100.0
     board_size_min: dd 0.0
 
-section .data
-    SEED: dd 0
-    RAND: dd 0
-    float_temp: dd 0
-    X_Coord: dd 0
-    Y_Coord: dd 0
-    speed: dd 0
-    heading: dd 0
-    R: dd 0
-    K: dd 0
-    Max_distance: dd 0
-    numCos: dd 0
-    CURR: dd 0
-    PREV: dd 0
-    SPT: dd 0 ; temporary stack pointer
-    SPMAIN: dd 0 ; stack pointer of main
-    CORS: dd 0
+
 section .bss
-    ; CURR: resd 1
-    ; PREV: resd 1
-    ; SPT: resd 1 ; temporary stack pointer
-    ; SPMAIN: resd 1 ; stack pointer of main
+    CURR: resd 1
+    PREV: resd 1
+    SPT: resd 1 ; temporary stack pointer
+    SPMAIN: resd 1 ; stack pointer of main
     STKSZ: equ 16*1024
     SCHEDULER_CO: equ 0
     PRINTER_CO: equ 1
     TARGET_CO: equ 2
-    ;CORS: resd 1
-    ;numCos: resd 1
+    CORS: resd 1
+    numCos: resd 1
     STK_OFF: equ 4
     shouldStop_OFF: equ 8
-    ; SEED: resd 1
-    ; RAND: resd 1
-    ; float_temp: resq 1
-    ; X_Coord: resd 1
-    ; Y_Coord: resd 1
-    ; speed: resd 1
-    ; heading: resd 1
-    ; R: resd 1
-    ; K: resd 1
-    ; Max_distance: resd 1
+    SEED: resd 1
+    RAND: resd 1
+    float_temp: resq 1
+    X_Coord: resd 1
+    Y_Coord: resd 1
+    speed: resd 1
+    heading: resd 1
+    R: resd 1
+    K: resd 1
+    Max_distance: resd 1
 
 ;returns co-routine address in ebx
 %macro get_co 1
@@ -118,7 +102,7 @@ section .bss
 
 %macro printInfo 1
 jmp %%skip_print
-section .data
+section .rodata
     %%str_to_print: db %1, 10, 0
 section .text
     %%skip_print:
@@ -156,7 +140,7 @@ main:
     mov eax, dword [ebp + 8]
     cmp eax, 6
     jae .no_err
-    printInfo "not enough arguments!"
+    ;printInfo "not enough arguments!"
     jmp .end
     .no_err:
     mov eax, dword [ebp + 12]

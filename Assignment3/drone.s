@@ -17,7 +17,7 @@ section .rodata
     float_format: db "%.2f", 10, 0
 %macro printInfo 1
 jmp %%skip_print
-section .data
+section .rodata
     %%str_to_print: db %1, 10, 0
 section .text
     %%skip_print:
@@ -88,7 +88,8 @@ section .bss
     delta_heading: resd 1
     SCHEDULER_CO: equ 0
     TARGET_CO: equ 2
-section .data
+    score: resd 1
+section .rodata
     one_eighty: dd 180.0
     ninety: dd 90.0
     sixty: dd 60.0
@@ -98,23 +99,16 @@ section .data
     min_angle: dd 0.0
     max_speed: dd 100.0
     min_speed: dd 0.0
-    score: dd 0
-    temp1: dd 1.0
-    temp2: dd 0.0
 
 section .text
 
 drone_func:
     pop_all_stats
     
-
-
     call moveDrone
     call generateNewAngle
     call generateNewSpeed
 
-
-    
     .drone_loop:
     call mayDestroy
     cmp eax, 1
@@ -128,14 +122,12 @@ drone_func:
     call moveDrone
     call generateNewAngle
     call generateNewSpeed
-
     push_all_stats
     get_co SCHEDULER_CO
     call resume
     pop_all_stats
     jmp .drone_loop
     .end_drone_loop:
-
 
 
 generateNewAngle:

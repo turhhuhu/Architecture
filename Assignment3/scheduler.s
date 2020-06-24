@@ -80,8 +80,6 @@ schedule_func:
     sub ebx, 3
     mov dword [numActiveDrones], ebx
     .scheduler_loop:
-    ;printfM int_format, dword [numActiveDrones]
-    ;printfM int_format, dword [currI]
     mov ebx, dword [numCos]
     sub ebx, 3
     Mod dword [currDroneI], ebx
@@ -119,7 +117,6 @@ schedule_func:
     mov dword [ebx + shouldStop_OFF], 1
     dec dword [numActiveDrones]
     .not_turn_off:
-    ;printfM int_format, dword [numActiveDrones]
     cmp dword [numActiveDrones], 1
     je .end_game
     inc dword [currI]

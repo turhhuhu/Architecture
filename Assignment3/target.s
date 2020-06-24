@@ -18,19 +18,8 @@ section .bss
     target_X: resd 1
     target_Y: resd 1
 
-section .data
+
 section .text
-%macro printInfo 1
-jmp %%skip_print
-    %%str_to_print: db %1, 10, 0
-    %%skip_print:
-    pushad
-    push %%str_to_print
-    push str_format
-    call printf
-    add esp, 8
-    popad
-%endmacro
 target_func:
     .target_loop:
     call createTarget

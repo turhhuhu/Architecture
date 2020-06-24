@@ -8,7 +8,7 @@ extern numCos
 
 %macro printInfo 1
 jmp %%skip_print
-section .data
+section .rodata
     %%str_to_print: db %1, 10, 0
 section .text
     %%skip_print:
@@ -56,10 +56,9 @@ section .rodata
     drone_format: db "%d,%.2f,%.2f,%.2f,%.2f,%d", 10, 0
     int_format: db "%d", 10, 0 
     float_format: db "%.2f", 10, 0
-section .data
-    float_temp: dd 0.0
 
 section .bss
+    float_temp: rest 1
     SCHEDULER_CO: equ 0
     TARGET_CO: equ 2
     STK_OFF: equ 4
@@ -72,7 +71,6 @@ section .bss
 
 section .text
 print_func:
-    printInfo "hello"
     .endless_loop:
     finit
     insert_float dword [target_Y]
