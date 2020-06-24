@@ -128,29 +128,13 @@ drone_func:
     call moveDrone
     call generateNewAngle
     call generateNewSpeed
-    ; printfM int_format, dword [score]
-    ; print_float_num dword [X_Coord]
-    ; print_float_num dword [Y_Coord]
-    ; print_float_num dword [speed]
-    ; print_float_num dword [heading]
+
     push_all_stats
-    ;printInfo "drone"
     get_co SCHEDULER_CO
     call resume
     pop_all_stats
     jmp .drone_loop
     .end_drone_loop:
-
-    ; fld dword [temp2]
-    ; fst dword [X_Coord]
-    ; fstp dword [Y_Coord]
-    ; fld dword [temp1]
-    ; fst dword [target_X]
-    ; fstp dword [target_Y]
-
-
-    ;call mayDestroy
-    ;printfM int_format, eax
 
 
 
@@ -251,7 +235,7 @@ moveDrone:
     fld dword [X_Coord]
     fcomi
     jb .x_not_above
-    ;printInfo "x above"
+    ;x above
     fsub st1
     fstp dword [X_Coord]
     .x_not_above:
@@ -259,7 +243,7 @@ moveDrone:
     fld dword [Y_Coord]
     fcomi
     jb .y_not_above
-    ;printInfo "y above"
+    ;y above
     fsub st1
     fstp dword [Y_Coord]
     .y_not_above:
@@ -271,7 +255,7 @@ moveDrone:
     fld dword [X_Coord]
     fcomi
     ja .x_not_below
-    ;printInfo "x below"
+    ;x below
     fld dword [board_size_max]
     fadd st1
     fstp dword [X_Coord]
@@ -280,7 +264,7 @@ moveDrone:
     fld dword [Y_Coord]
     fcomi
     ja .y_not_below
-    ;printInfo "y below"
+    ;y below
     fld dword [board_size_max]
     fadd st1
     fstp dword [Y_Coord]

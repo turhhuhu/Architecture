@@ -25,6 +25,7 @@ section .bss
     SCORE_OFF: equ 40
     numActiveDrones: resd 1
     M: resd 1
+    
 %macro printInfo 1
 jmp %%skip_print
 section .data
@@ -75,7 +76,6 @@ section .text
 section .text
 
 schedule_func:
-    printInfo "scheduler"
     mov ebx, dword [numCos]
     sub ebx, 3
     mov dword [numActiveDrones], ebx
@@ -115,6 +115,7 @@ schedule_func:
     jne .not_turn_off   
     call find_M_drone
     get_co eax
+
     mov dword [ebx + shouldStop_OFF], 1
     dec dword [numActiveDrones]
     .not_turn_off:

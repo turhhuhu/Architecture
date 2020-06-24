@@ -48,6 +48,7 @@ createTarget:
     call get_scaled_random
     add esp, 4
 
+
     fld dword [RAND]
     fstp dword [target_X]
     

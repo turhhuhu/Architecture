@@ -5,6 +5,9 @@ extern drone_func
 extern print_func
 extern target_func
 extern printf
+extern sscanf
+extern createTarget
+extern free
 global main
 global end_co
 global CORS
@@ -25,8 +28,7 @@ global numCos
 global R
 global K
 global Max_distance
-extern sscanf
-extern createTarget
+
 section .rodata
     str_format: db "%s", 0
     int_format: db "%d", 10, 0 
@@ -36,30 +38,47 @@ section .rodata
     MAX_INT: dd 65535
     board_size_max: dd 100.0
     board_size_min: dd 0.0
+
+section .data
+    SEED: dd 0
+    RAND: dd 0
+    float_temp: dd 0
+    X_Coord: dd 0
+    Y_Coord: dd 0
+    speed: dd 0
+    heading: dd 0
+    R: dd 0
+    K: dd 0
+    Max_distance: dd 0
+    numCos: dd 0
+    CURR: dd 0
+    PREV: dd 0
+    SPT: dd 0 ; temporary stack pointer
+    SPMAIN: dd 0 ; stack pointer of main
+    CORS: dd 0
 section .bss
-    CURR: resd 1
-    PREV: resd 1
-    SPT: resd 1 ; temporary stack pointer
-    SPMAIN: resd 1 ; stack pointer of main
+    ; CURR: resd 1
+    ; PREV: resd 1
+    ; SPT: resd 1 ; temporary stack pointer
+    ; SPMAIN: resd 1 ; stack pointer of main
     STKSZ: equ 16*1024
     SCHEDULER_CO: equ 0
     PRINTER_CO: equ 1
     TARGET_CO: equ 2
-    CORS: resd 1
-    numCos: resd 1
-    random_num:
+    ;CORS: resd 1
+    ;numCos: resd 1
     STK_OFF: equ 4
     shouldStop_OFF: equ 8
-    SEED: resd 1
-    RAND: resd 1
-    float_temp: resq 1
-    X_Coord: resd 1
-    Y_Coord: resd 1
-    speed: resd 1
-    heading: resd 1
-    R: resd 1
-    K: resd 1
-    Max_distance: resd 1
+    ; SEED: resd 1
+    ; RAND: resd 1
+    ; float_temp: resq 1
+    ; X_Coord: resd 1
+    ; Y_Coord: resd 1
+    ; speed: resd 1
+    ; heading: resd 1
+    ; R: resd 1
+    ; K: resd 1
+    ; Max_distance: resd 1
 
 ;returns co-routine address in ebx
 %macro get_co 1
@@ -149,9 +168,9 @@ main:
     sscanfM Max_distance, float_input_format, dword [eax + 16]
     sscanfM SEED, int_input_format, dword [eax + 20]
 
-    finit
     call initAllCors
     call start_schedule
+    call freeAllCors
     .end:
     pop ebp
     ret
@@ -269,6 +288,42 @@ initCo:
     mov [ebx + STK_OFF], esp ; save new SPi value (after all the pushes)
     mov esp, [SPT]
 
+    popad
+    pop ebp
+    ret
+
+freeAllCors:
+    push ebp
+    mov ebp, esp
+    pushad
+    mov ecx, dword [numCos]
+    dec ecx
+    .free_loop:
+    cmp ecx, -1
+    je .end_free_loop
+    get_co ecx
+    mov ebx, dword [ebx + STK_OFF]
+    cmp ecx, 2
+    jbe .not_drone
+    add ebx, 20
+    .not_drone:
+    add ebx, 40
+    sub ebx, STKSZ
+    pushad
+    push ebx
+    call free
+    add esp, 4
+    popad
+    dec ecx
+    jmp .free_loop
+    .end_free_loop:
+    ; get_co ecx
+    ; mov ebx, dword [ebx + STK_OFF]
+    ; sub ebx, dword [temp]
+    ; printfM int_format, ebx
+    push dword [CORS]
+    call free
+    add esp, 4
     popad
     pop ebp
     ret

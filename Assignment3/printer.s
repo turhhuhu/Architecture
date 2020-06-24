@@ -5,39 +5,13 @@ extern resume
 extern target_X
 extern target_Y
 extern numCos
-section .rodata
-    str_format: db "%s", 0
-    target_format: db "%.2f,%.2f", 10, 0
-    drone_format: db "%d,%.2f,%.2f,%.2f,%.2f,%d", 10, 0
-    int_format: db "%d", 10, 0 
-    float_format: db "%.2f", 10, 0
-section .data
-    float_temp: dd 0.0
 
-section .bss
-    SCHEDULER_CO: equ 0
-    TARGET_CO: equ 2
-    STK_OFF: equ 4
-    SCORE_OFF: equ 40
-    X_OFF: equ 44
-    Y_OFF: equ 48
-    SPEED_OFF: equ 52
-    HEADINGS_OFF:equ 56
-    shouldStop_OFF: equ 8
-
-section .text
 %macro printInfo 1
 jmp %%skip_print
 section .data
     %%str_to_print: db %1, 10, 0
 section .text
     %%skip_print:
-    pushad
-    push %%str_to_print
-    push str_format
-    call printf
-    add esp, 8
-    popad
 %endmacro
 
 %macro printfM 2
@@ -76,15 +50,36 @@ section .text
     pop ecx
 %endmacro
 
+section .rodata
+    str_format: db "%s", 0
+    target_format: db "%.2f,%.2f", 10, 0
+    drone_format: db "%d,%.2f,%.2f,%.2f,%.2f,%d", 10, 0
+    int_format: db "%d", 10, 0 
+    float_format: db "%.2f", 10, 0
+section .data
+    float_temp: dd 0.0
+
+section .bss
+    SCHEDULER_CO: equ 0
+    TARGET_CO: equ 2
+    STK_OFF: equ 4
+    SCORE_OFF: equ 40
+    X_OFF: equ 44
+    Y_OFF: equ 48
+    SPEED_OFF: equ 52
+    HEADINGS_OFF:equ 56
+    shouldStop_OFF: equ 8
+
+section .text
 print_func:
-    printInfo "printer"
-    
+    printInfo "hello"
     .endless_loop:
+    finit
     insert_float dword [target_Y]
     insert_float dword [target_X]
     push target_format
     call printf
-    add esp, 12
+    add esp, 20
     mov ecx, 3
     mov eax, dword [numCos]
     .print_loop:
